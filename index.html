@@ -72,17 +72,20 @@
       gap: 6px;
       margin-top: 8px;
     }
-    .zone-tabs {
+    .zone-tabs,
+    .map-tabs {
       display: flex;
       gap: 5px;
       margin-top: 8px;
     }
-    .zone-tabs button {
+    .zone-tabs button,
+    .map-tabs button {
       flex: 1;
       background: #e2e8f0;
       color: #1e293b;
     }
-    .zone-tabs button.active {
+    .zone-tabs button.active,
+    .map-tabs button.active {
       background: #2563eb;
       color: #ffffff;
     }
@@ -183,6 +186,11 @@
       <button type="button" data-zone="4">4구역</button>
       <button type="button" data-zone="5">5구역</button>
     </div>
+    <div class="map-tabs" aria-label="배경지도 선택">
+      <button type="button" class="active" data-map="light">밝은지도</button>
+      <button type="button" data-map="topo">일반지도</button>
+      <button type="button" data-map="satellite">위성지도</button>
+    </div>
     <div class="buttons">
       <button id="rotateSelected" class="secondary">선택 위치 자동회전</button>
       <button id="rotateAll" class="secondary">전체 자동회전</button>
@@ -219,6 +227,23 @@
         label: "5구역",
         unitsUrl: "apgujeong_5_units.geojson",
         riverUrl: "hangang_line_zone45.geojson"
+      }
+    };
+    const MAP_CONFIGS = {
+      light: {
+        label: "밝은지도",
+        url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        credit: "CARTO, OpenStreetMap"
+      },
+      topo: {
+        label: "일반지도",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+        credit: "Esri World Topographic Map"
+      },
+      satellite: {
+        label: "위성지도",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        credit: "Esri World Imagery"
       }
     };
     const statusEl = document.getElementById("status");
@@ -304,22 +329,35 @@
       if (statusEl) statusEl.textContent = message;
     }
 
-    function applyPublicBaseMap() {
+    function setActiveMapButton(mapId) {
+      for (const button of document.querySelectorAll("[data-map]")) {
+        button.classList.toggle("active", button.dataset.map === mapId);
+      }
+    }
+
+    function applyPublicBaseMap(mapId = "light") {
       if (publicBaseLayer) {
         viewer.imageryLayers.remove(publicBaseLayer, true);
         publicBaseLayer = null;
       }
 
+      if (vworldLayer) {
+        viewer.imageryLayers.remove(vworldLayer, true);
+        vworldLayer = null;
+      }
+
+      const config = MAP_CONFIGS[mapId] || MAP_CONFIGS.light;
       const provider = new Cesium.UrlTemplateImageryProvider({
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        url: config.url,
         minimumLevel: 0,
         maximumLevel: 19,
         tilingScheme: new Cesium.WebMercatorTilingScheme(),
-        credit: "Esri World Imagery"
+        credit: config.credit
       });
 
       publicBaseLayer = viewer.imageryLayers.addImageryProvider(provider, 0);
-      setStatus("공개용 위성 배경을 적용했습니다.");
+      setActiveMapButton(mapId);
+      setStatus(`${config.label} 배경을 적용했습니다.`);
     }
 
     function readStoredVworldKey() {
@@ -1754,7 +1792,7 @@
     function applyVworldBaseMap() {
       const key = readStoredVworldKey();
       if (!key) {
-        applyPublicBaseMap();
+        applyPublicBaseMap("light");
         return;
       }
 
@@ -1776,6 +1814,7 @@
 
       vworldLayer = viewer.imageryLayers.addImageryProvider(provider);
       viewer.imageryLayers.lowerToBottom(vworldLayer);
+      setActiveMapButton("");
       setStatus("V-World 위성 배경 적용 시도 완료.");
     }
 
@@ -1825,6 +1864,12 @@
     for (const button of document.querySelectorAll("[data-zone]")) {
       button.addEventListener("click", () => {
         loadZone(button.dataset.zone);
+      });
+    }
+
+    for (const button of document.querySelectorAll("[data-map]")) {
+      button.addEventListener("click", () => {
+        applyPublicBaseMap(button.dataset.map);
       });
     }
 
