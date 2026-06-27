@@ -238,9 +238,7 @@
       infoBox: true,
       selectionIndicator: true,
       sceneMode: Cesium.SceneMode.SCENE3D,
-      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-        url: "https://tile.openstreetmap.org/"
-      }),
+      baseLayer: false,
       terrainProvider: new Cesium.EllipsoidTerrainProvider()
     });
 
@@ -281,6 +279,7 @@
 
     let unitsDataSource = null;
     let vworldLayer = null;
+    let publicBaseLayer = null;
     const overlayEntities = [];
     const selectedSightEntities = [];
     const riverLineEntities = [];
@@ -303,6 +302,24 @@
 
     function setStatus(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function applyPublicBaseMap() {
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
+      }
+
+      const provider = new Cesium.UrlTemplateImageryProvider({
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        minimumLevel: 0,
+        maximumLevel: 19,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        credit: "Esri World Imagery"
+      });
+
+      publicBaseLayer = viewer.imageryLayers.addImageryProvider(provider, 0);
+      setStatus("공개용 위성 배경을 적용했습니다.");
     }
 
     function readStoredVworldKey() {
@@ -1737,12 +1754,16 @@
     function applyVworldBaseMap() {
       const key = readStoredVworldKey();
       if (!key) {
-        setStatus("V-World 공개용 키가 없어 OSM 배경을 사용합니다.");
+        applyPublicBaseMap();
         return;
       }
 
       if (vworldLayer) {
         viewer.imageryLayers.remove(vworldLayer, true);
+      }
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
       }
 
       const provider = new Cesium.UrlTemplateImageryProvider({
