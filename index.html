@@ -187,8 +187,8 @@
       <button type="button" data-zone="5">5구역</button>
     </div>
     <div class="map-tabs" aria-label="배경지도 선택">
-      <button type="button" class="active" data-map="light">밝은지도</button>
-      <button type="button" data-map="topo">일반지도</button>
+      <button type="button" class="active" data-map="street">도로지도</button>
+      <button type="button" data-map="light">밝은지도</button>
       <button type="button" data-map="satellite">위성지도</button>
     </div>
     <div class="buttons">
@@ -230,15 +230,15 @@
       }
     };
     const MAP_CONFIGS = {
+      street: {
+        label: "도로지도",
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        credit: "OpenStreetMap"
+      },
       light: {
         label: "밝은지도",
         url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
         credit: "CARTO, OpenStreetMap"
-      },
-      topo: {
-        label: "일반지도",
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-        credit: "Esri World Topographic Map"
       },
       satellite: {
         label: "위성지도",
@@ -335,7 +335,7 @@
       }
     }
 
-    function applyPublicBaseMap(mapId = "light") {
+    function applyPublicBaseMap(mapId = "street") {
       if (publicBaseLayer) {
         viewer.imageryLayers.remove(publicBaseLayer, true);
         publicBaseLayer = null;
@@ -346,7 +346,7 @@
         vworldLayer = null;
       }
 
-      const config = MAP_CONFIGS[mapId] || MAP_CONFIGS.light;
+      const config = MAP_CONFIGS[mapId] || MAP_CONFIGS.street;
       const provider = new Cesium.UrlTemplateImageryProvider({
         url: config.url,
         minimumLevel: 0,
@@ -1792,7 +1792,7 @@
     function applyVworldBaseMap() {
       const key = readStoredVworldKey();
       if (!key) {
-        applyPublicBaseMap("light");
+        applyPublicBaseMap("street");
         return;
       }
 
