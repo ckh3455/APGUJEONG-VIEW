@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Apgujeong 2 Units 3D Test - v8 Floor Bands</title>
+  <title>압구정 조망 시뮬레이션</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <style>
@@ -19,19 +19,19 @@
       z-index: 5;
       top: 14px;
       left: 14px;
-      width: 360px;
+      width: 300px;
       max-width: calc(100vw - 28px);
-      padding: 12px;
+      padding: 9px;
       background: rgba(255, 255, 255, 0.94);
       border: 1px solid #d9dee7;
       border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 11px;
+      line-height: 1.35;
     }
     .panel h1 {
-      margin: 0 0 8px;
-      font-size: 16px;
+      margin: 0 0 6px;
+      font-size: 14px;
     }
     .row {
       display: grid;
@@ -55,7 +55,7 @@
       font-size: 12px;
     }
     button {
-      padding: 8px 10px;
+      padding: 6px 8px;
       border: 0;
       border-radius: 6px;
       background: #2563eb;
@@ -68,8 +68,23 @@
     }
     .buttons {
       display: flex;
-      gap: 8px;
-      margin-top: 10px;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .zone-tabs {
+      display: flex;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .zone-tabs button {
+      flex: 1;
+      background: #e2e8f0;
+      color: #1e293b;
+    }
+    .zone-tabs button.active {
+      background: #2563eb;
+      color: #ffffff;
     }
     .status {
       margin-top: 8px;
@@ -80,26 +95,26 @@
       white-space: pre-wrap;
     }
     .hint {
-      margin-top: 8px;
+      margin-top: 6px;
       color: #64748b;
-      font-size: 12px;
+      font-size: 10px;
     }
     .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      gap: 4px;
+      margin-top: 6px;
     }
     .legend button {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 5px 8px;
+      gap: 4px;
+      padding: 3px 6px;
       border: 1px solid #cbd5e1;
       border-radius: 999px;
       background: #ffffff;
       color: #1f2937;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
     }
     .legend button.active {
@@ -107,24 +122,52 @@
       box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
     }
     .swatch {
-      width: 11px;
-      height: 11px;
+      width: 9px;
+      height: 9px;
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-radius: 2px;
     }
     .cesium-infoBox {
-      width: 500px;
-      max-width: 46vw;
+      width: 300px;
+      max-width: 42vw;
+      font-size: 70%;
+    }
+    .cesium-infoBox-title {
+      font-size: 14px;
+      line-height: 1.25;
     }
     .cesium-infoBox-defaultTable th {
-      width: 86px;
-      min-width: 86px;
+      width: 58px;
+      min-width: 58px;
       white-space: nowrap;
       word-break: keep-all;
     }
     .cesium-infoBox-defaultTable td {
       word-break: keep-all;
       line-height: 1.5;
+    }
+    .floor-change {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: center;
+    }
+    .floor-band {
+      display: inline-block;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .floor-band-0 {
+      color: #60a5fa;
+    }
+    .floor-band-1 {
+      color: #34d399;
+    }
+    .floor-band-2 {
+      color: #fbbf24;
+    }
+    .floor-band-3 {
+      color: #fb7185;
     }
   </style>
 </head>
@@ -133,7 +176,18 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">공개용 / 높이별 차폐 원인 표시</div>
+    <div class="hint">버전: v22-recording-safe / 자동회전 + 녹화모드</div>
+    <div class="zone-tabs" aria-label="구역 선택">
+      <button type="button" class="active" data-zone="ALL">전체</button>
+      <button type="button" data-zone="2">2구역</button>
+      <button type="button" data-zone="4">4구역</button>
+      <button type="button" data-zone="5">5구역</button>
+    </div>
+    <div class="buttons">
+      <button id="rotateSelected" class="secondary">선택 위치 자동회전</button>
+      <button id="rotateAll" class="secondary">전체 자동회전</button>
+      <button id="stopRotate" class="secondary">회전 정지</button>
+    </div>
     <div class="row">
       <label>평형 범례</label>
       <div class="legend" id="legend"></div>
@@ -144,10 +198,34 @@
     Cesium.Ion.defaultAccessToken = "";
 
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
+    const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
+    const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
+    const ZONE_CONFIGS = {
+      "ALL": {
+        label: "전체",
+        zoneIds: ["2", "4", "5"]
+      },
+      "2": {
+        label: "2구역",
+        unitsUrl: "apgujeong_2_units.geojson",
+        riverUrl: "hangang_line_zone2.geojson"
+      },
+      "4": {
+        label: "4구역",
+        unitsUrl: "apgujeong_4_units.geojson",
+        riverUrl: "hangang_line_zone45.geojson"
+      },
+      "5": {
+        label: "5구역",
+        unitsUrl: "apgujeong_5_units.geojson",
+        riverUrl: "hangang_line_zone45.geojson"
+      }
+    };
     const statusEl = document.getElementById("status");
     const legendEl = document.getElementById("legend");
     const riverExtendInput = document.getElementById("riverExtendMeters");
     const PUBLIC_VWORLD_KEY = "";
+    const VWORLD_KEY_STORAGE = "apgujeong_vworld_key";
 
     const viewer = new Cesium.Viewer("cesiumContainer", {
       animation: false,
@@ -177,6 +255,11 @@
       controller.enableLook = true;
       controller.minimumZoomDistance = 20;
       controller.maximumZoomDistance = 6000;
+      controller.inertiaZoom = 0.18;
+      controller.maximumMovementRatio = 0.055;
+      if ("_zoomFactor" in controller) {
+        controller._zoomFactor = 1.8;
+      }
       if (viewer.scene.mode !== Cesium.SceneMode.SCENE3D) {
         viewer.scene.morphTo3D(0);
       }
@@ -208,11 +291,83 @@
     let riverLinesForDisplay = [];
     let riverRawGeoJson = null;
     let lastRiverStats = null;
+    let currentZoneId = "ALL";
+    let loadedLegendItems = [];
+    let autoRotateActive = false;
+    let autoRotateCenter = null;
+    let autoRotateHeadingDeg = 335;
+    let autoRotatePitch = Cesium.Math.toRadians(-38);
+    let autoRotateRange = 900;
+    let autoRotateLastMs = 0;
     const viewAnalysisByFid = new Map();
 
     function setStatus(message) {
       if (statusEl) statusEl.textContent = message;
     }
+
+    function readStoredVworldKey() {
+      const params = new URLSearchParams(window.location.search);
+      const keyFromUrl = (params.get("key") || params.get("vworldKey") || "").trim();
+      if (keyFromUrl) {
+        localStorage.setItem(VWORLD_KEY_STORAGE, keyFromUrl);
+        params.delete("key");
+        params.delete("vworldKey");
+        const cleanQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`;
+        window.history.replaceState({}, document.title, cleanUrl);
+        return keyFromUrl;
+      }
+      return (PUBLIC_VWORLD_KEY || localStorage.getItem(VWORLD_KEY_STORAGE) || "").trim();
+    }
+
+    function stopAutoRotate() {
+      autoRotateActive = false;
+      autoRotateCenter = null;
+      autoRotateLastMs = 0;
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      enable3DControls();
+      setStatus("자동회전을 정지했습니다.");
+    }
+
+    function cameraDistanceTo(center, fallback) {
+      const distance = Cesium.Cartesian3.distance(viewer.camera.positionWC, center);
+      if (!Number.isFinite(distance) || distance < 120 || distance > 3000) return fallback;
+      return distance;
+    }
+
+    function getSelectedRotateCenter() {
+      const entity = viewer.selectedEntity;
+      if (!entity || !entity.positionForSight) return null;
+      const lonLat = xyToLonLat(entity.positionForSight.xy);
+      const height = Math.max(30, Number(entity.positionForSight.height || 80) * 0.45);
+      return Cesium.Cartesian3.fromDegrees(lonLat.lon, lonLat.lat, height);
+    }
+
+    function startAutoRotate(center, range) {
+      autoRotateCenter = center;
+      autoRotateRange = range;
+      autoRotateHeadingDeg = Cesium.Math.toDegrees(viewer.camera.heading || Cesium.Math.toRadians(335));
+      autoRotatePitch = Cesium.Math.toRadians(-38);
+      autoRotateLastMs = performance.now();
+      autoRotateActive = true;
+      enable3DControls();
+    }
+
+    viewer.clock.onTick.addEventListener(() => {
+      if (!autoRotateActive || !autoRotateCenter) return;
+      const now = performance.now();
+      const deltaSeconds = autoRotateLastMs ? Math.min((now - autoRotateLastMs) / 1000, 0.1) : 0;
+      autoRotateLastMs = now;
+      autoRotateHeadingDeg = normalizeAngle(autoRotateHeadingDeg + AUTO_ROTATE_SPEED_DEG_PER_SEC * deltaSeconds);
+      viewer.camera.lookAt(
+        autoRotateCenter,
+        new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(autoRotateHeadingDeg),
+          autoRotatePitch,
+          autoRotateRange
+        )
+      );
+    });
 
     function colorFromHex(value, fallback, alpha) {
       const text = String(value || "").trim();
@@ -491,6 +646,7 @@
         for (const ring of rings) {
           const footprint = {
             fid: props.fid,
+            zoneName: String(props.zone || props.source_zone || "").trim(),
             dong: props.dong,
             unitType: String(props.unit_type || "").trim(),
             floors: Number(props.floors || 0),
@@ -501,9 +657,10 @@
             center: ringCentroid(ring),
             segments: ringSegments(ring)
           };
+          footprint.groupKey = `${footprint.zoneName}:${footprint.dong || ""}`;
           footprints.push(footprint);
 
-          const dongKey = String(props.dong || "");
+          const dongKey = footprint.groupKey;
           if (!dongPointGroups.has(dongKey)) dongPointGroups.set(dongKey, []);
           dongPointGroups.get(dongKey).push(...ring);
         }
@@ -516,9 +673,9 @@
       }
 
       for (const footprint of footprints) {
-        const group = dongPointGroups.get(String(footprint.dong || "")) || footprint.ring;
+        const group = dongPointGroups.get(footprint.groupKey) || footprint.ring;
         footprint.groupCenter = ringCentroid(group);
-        footprint.groupHullSegments = dongHullSegments.get(String(footprint.dong || "")) || footprint.segments;
+        footprint.groupHullSegments = dongHullSegments.get(footprint.groupKey) || footprint.segments;
       }
     }
 
@@ -589,12 +746,13 @@
           const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
           if (t === null || t <= 2 || t >= maxDistance) continue;
 
-          if (String(footprint.dong) === String(sourceFootprint.dong)) {
+          if (String(footprint.groupKey) === String(sourceFootprint.groupKey)) {
             internalBlocked = true;
             continue;
           }
 
           hits.push({
+            zoneName: footprint.zoneName,
             dong: footprint.dong,
             unitType: footprint.unitType,
             distance: t,
@@ -649,6 +807,41 @@
       openByDirection[directionName].push(ray);
     }
 
+    function isBetterAngleProfile(candidate, current) {
+      if (!current) return true;
+      const candidateHeight = Number(candidate.blockerHeight || 0);
+      const currentHeight = Number(current.blockerHeight || 0);
+      if (candidateHeight !== currentHeight) return candidateHeight < currentHeight;
+      return Number(candidate.distance || 0) < Number(current.distance || 0);
+    }
+
+    function buildAngleProfiles(candidates) {
+      const byAngle = new Map();
+      for (const candidate of candidates) {
+        const current = byAngle.get(candidate.angle);
+        if (isBetterAngleProfile(candidate, current)) {
+          byAngle.set(candidate.angle, {
+            angle: candidate.angle,
+            order: candidate.angle,
+            distance: candidate.distance,
+            origin: candidate.origin,
+            end: candidate.end,
+            blockerHeight: candidate.blockerHeight,
+            blockers: candidate.blockers,
+            sample: candidate.sample
+          });
+        }
+      }
+      return [...byAngle.values()].sort((a, b) => a.order - b.order);
+    }
+
+    function firstBlockingBlocker(blockers, observerHeight) {
+      return (blockers || [])
+        .slice()
+        .sort((a, b) => a.distance - b.distance)
+        .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
+    }
+
     function collectFacadeCandidates(footprint) {
       const samples = sampleFacadeSegments(footprint, 5);
       const blockers = new Map();
@@ -664,7 +857,7 @@
           if (blockerProfile.internalBlocked) continue;
 
           for (const blocker of blockerProfile.blockers) {
-            const key = `${blocker.dong}동`;
+            const key = `${blocker.zoneName || ""}:${blocker.dong}동`;
             const current = blockers.get(key);
             if (!current || blocker.distance < current.distance) blockers.set(key, blocker);
           }
@@ -684,6 +877,7 @@
       return {
         samples,
         candidates,
+        angleProfiles: buildAngleProfiles(candidates),
         blockers: [...blockers.values()].sort((a, b) => a.distance - b.distance)
       };
     }
@@ -699,33 +893,34 @@
       let visibleFacadeLength = 0;
       let visibleSampleCount = 0;
 
-      for (const candidate of candidateData.candidates) {
-        potentialAngles.add(candidate.angle);
-        if (candidate.blockerHeight >= observerHeight) {
-          for (const blocker of candidate.blockers || []) {
-            if (blocker.height >= observerHeight && blocker.floors > 0) {
-              blockingFloorSet.add(Math.round(blocker.floors));
-            }
+      const angleProfiles = candidateData.angleProfiles || buildAngleProfiles(candidateData.candidates || []);
+
+      for (const profile of angleProfiles) {
+        potentialAngles.add(profile.angle);
+        if (profile.blockerHeight >= observerHeight) {
+          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
+          if (activeBlocker) {
+            blockingFloorSet.add(Math.round(activeBlocker.floors));
           }
           continue;
         }
 
         const ray = {
-          angle: candidate.angle,
-          order: candidate.angle,
-          distance: candidate.distance,
-          origin: candidate.origin,
-          end: candidate.end
+          angle: profile.angle,
+          order: profile.angle,
+          distance: profile.distance,
+          origin: profile.origin,
+          end: profile.end
         };
         addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays);
 
-        if (!visibleSamples.has(candidate.sample)) {
-          visibleSamples.add(candidate.sample);
+        if (!visibleSamples.has(profile.sample)) {
+          visibleSamples.add(profile.sample);
           visibleSampleCount += 1;
-          visibleFacadeLength += candidate.sample.length;
+          visibleFacadeLength += profile.sample.length;
           visibleFacadeSegments.push({
-            a: candidate.sample.a,
-            b: candidate.sample.b
+            a: profile.sample.a,
+            b: profile.sample.b
           });
         }
       }
@@ -766,8 +961,7 @@
       for (let floor = 1; floor <= floorCount; floor += 1) {
         const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
         const comparable = {
-          totalOpen: summary.totalOpen,
-          blockingFloors: summary.blockingFloors.join(",")
+          totalOpen: summary.totalOpen
         };
 
         if (!previous) {
@@ -775,9 +969,7 @@
           continue;
         }
 
-        const same =
-          comparable.totalOpen === previous.comparable.totalOpen &&
-          comparable.blockingFloors === previous.comparable.blockingFloors;
+        const same = comparable.totalOpen === previous.comparable.totalOpen;
 
         if (same) {
           previous.end = floor;
@@ -1010,7 +1202,7 @@
       }
     }
 
-    function addSharpOutlineAndLabel(entity, height, labelText, unitType) {
+    function addSharpOutlineAndLabel(entity, height, labelText, unitType, filterKey = unitType) {
       const hierarchy = entity.polygon.hierarchy && entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
       if (!hierarchy || !hierarchy.positions) return;
 
@@ -1037,7 +1229,7 @@
 
       const bottomOutline = viewer.entities.add({
         name: `${entity.name} 외곽선`,
-        unitType,
+        unitType: filterKey,
         polyline: {
           positions,
           width: 1,
@@ -1049,7 +1241,7 @@
 
       const topOutline = viewer.entities.add({
         name: `${entity.name} 상단 외곽선`,
-        unitType,
+        unitType: filterKey,
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArrayHeights(topDegrees),
           width: 1,
@@ -1065,7 +1257,7 @@
         const lon = Cesium.Math.toDegrees(cartographic.longitude);
         const lat = Cesium.Math.toDegrees(cartographic.latitude);
         const sideOutline = viewer.entities.add({
-          unitType,
+          unitType: filterKey,
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArrayHeights([
               lon, lat, 0,
@@ -1082,7 +1274,7 @@
       if (labelText) {
         const labelEntity = viewer.entities.add({
           name: `${entity.name} 라벨`,
-          unitType,
+          unitType: filterKey,
           position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height + 2),
           label: {
             text: labelText,
@@ -1111,17 +1303,35 @@
     function applyUnitFilter(unitType) {
       currentFilter = unitType;
       if (!unitsDataSource) return;
+      const filterText = String(unitType);
+      const zonePrefix = "ZONE:";
+      const isZoneFilter = filterText.startsWith(zonePrefix);
+      const zoneName = isZoneFilter ? filterText.slice(zonePrefix.length) : "";
+      const zoneSpecificFilter = currentZoneId === "ALL" && !isZoneFilter && filterText.includes(":");
+      const targetZoneName = zoneSpecificFilter ? filterText.split(":")[0] : "";
+
+      function isEntityHighlighted(entity) {
+        if (unitType === "ALL" || isZoneFilter) return true;
+        if (zoneSpecificFilter && entity.zoneName !== targetZoneName) return true;
+        return entity.filterKey === unitType;
+      }
+
+      function isOverlayHighlighted(overlay) {
+        if (unitType === "ALL" || isZoneFilter) return true;
+        if (zoneSpecificFilter && !String(overlay.unitType || "").startsWith(`${targetZoneName}:`)) return true;
+        return overlay.unitType === unitType;
+      }
 
       for (const entity of unitsDataSource.entities.values) {
         if (!entity.polygon) continue;
-        const selected = unitType === "ALL" || entity.unitType === unitType;
+        const selected = isEntityHighlighted(entity);
         const opacity = selected ? 1 : 0.16;
         entity.show = true;
         entity.polygon.material = entity.baseColor.withAlpha(opacity);
       }
 
       for (const overlay of overlayEntities) {
-        const selected = unitType === "ALL" || overlay.unitType === unitType;
+        const selected = isOverlayHighlighted(overlay);
         overlay.show = selected;
       }
 
@@ -1130,24 +1340,41 @@
       }
     }
 
-    function buildLegend(items) {
+    function buildLegend(items, allFilter = "ALL", allLabel = "전체") {
       legendEl.innerHTML = "";
       const allButton = document.createElement("button");
       allButton.type = "button";
-      allButton.dataset.unitType = "ALL";
-      allButton.className = "active";
-      allButton.textContent = "전체";
-      allButton.addEventListener("click", () => applyUnitFilter("ALL"));
+      allButton.dataset.unitType = allFilter;
+      allButton.className = currentFilter === allFilter ? "active" : "";
+      allButton.textContent = allLabel;
+      allButton.addEventListener("click", () => applyUnitFilter(allFilter));
       legendEl.appendChild(allButton);
 
       for (const item of items) {
         const button = document.createElement("button");
         button.type = "button";
-        button.dataset.unitType = item.unitType;
-        button.innerHTML = `<span class="swatch" style="background:${item.color}"></span>${item.unitType}PY`;
-        button.addEventListener("click", () => applyUnitFilter(item.unitType));
+        button.dataset.unitType = item.filterKey;
+        button.className = currentFilter === item.filterKey ? "active" : "";
+        button.innerHTML = `<span class="swatch" style="background:${item.color}"></span>${item.label}`;
+        button.addEventListener("click", () => applyUnitFilter(item.filterKey));
         legendEl.appendChild(button);
       }
+    }
+
+    function buildDefaultLegend() {
+      if (currentZoneId === "ALL") {
+        buildLegend([], "ALL", "전체");
+        return;
+      }
+      buildLegend(loadedLegendItems, "ALL", "전체");
+    }
+
+    function showLegendForSelectedEntity(entity) {
+      if (currentZoneId !== "ALL" || !entity || !entity.zoneName) return;
+      const zoneName = entity.zoneName;
+      const zoneItems = loadedLegendItems.filter(item => item.zoneName === zoneName);
+      buildLegend(zoneItems, `ZONE:${zoneName}`, `${zoneName} 전체`);
+      applyUnitFilter(`ZONE:${zoneName}`);
     }
 
     function drawSelectedSightLines(entity) {
@@ -1217,45 +1444,80 @@
       return entries.length ? entries.join(" / ") : "0도";
     }
 
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatUnitType(value) {
+      const text = String(value ?? "").trim();
+      if (!text) return "";
+      return /py|평/i.test(text) ? escapeHtml(text) : `${escapeHtml(text)} PY`;
+    }
+
+    function formatDong(value) {
+      const text = String(value ?? "").trim();
+      if (!text) return "";
+      return /동$/.test(text) ? escapeHtml(text) : `${escapeHtml(text)}동`;
+    }
+
+    function formatFloorCount(value) {
+      const floor = Math.round(Number(value || 0));
+      return floor > 0 ? `${floor}층` : "";
+    }
+
+    function formatFloorBandLabel(band, floorCount) {
+      if (band.start === 1 && band.end < floorCount) return `${band.end}층 이하`;
+      if (band.end === floorCount && band.start > 1) return `${band.start}층부터`;
+      if (band.start === 1 && band.end === floorCount) return "전층";
+      if (band.start === band.end) return `${band.start}층`;
+      return `${band.start}~${band.end}층`;
+    }
+
+    function floorBandColor(index) {
+      return ["#60a5fa", "#34d399", "#fbbf24", "#fb7185"][index % 4];
+    }
+
+    function formatFloorBandItem(label, angle, index) {
+      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(angle)}도</span>`;
+    }
+
     function formatFloorBands(analysis) {
       if (!analysis || !analysis.floorBands || !analysis.floorBands.length) return "계산 전";
       const floorCount = analysis.displayFloor;
       const bands = analysis.floorBands;
       if (bands.length === 1) {
         const only = bands[0];
-        return `층별 변화 없음 (전층 ${only.summary.totalOpen}도)`;
+        return formatFloorBandItem("전층", only.summary.totalOpen, 0);
       }
-      return bands
-        .map(band => {
-          const angle = band.summary.totalOpen;
-          const blockers = (band.summary.blockingFloors || [])
-            .filter(floor => floor > 0)
-            .map(floor => `${floor}층`)
-            .join("·");
-          const blockerText = blockers ? `(${blockers} 차폐)` : "";
-          if (band.start === 1 && band.end < floorCount) return `${band.end}층 이하 ${angle}도${blockerText}`;
-          if (band.end === floorCount && band.start > 1) return `${band.start}층부터 ${angle}도${blockerText}`;
-          if (band.start === 1 && band.end === floorCount) return `전층 ${angle}도${blockerText}`;
-          if (band.start === band.end) return `${band.start}층 ${angle}도${blockerText}`;
-          return `${band.start}~${band.end}층 ${angle}도${blockerText}`;
-        })
-        .join(" / ");
+      const items = bands.map((band, index) => {
+        const label = formatFloorBandLabel(band, floorCount);
+        const angle = band.summary.totalOpen;
+        return formatFloorBandItem(label, angle, index);
+      });
+      return items.join("");
     }
 
     function buildDescription(props) {
       const analysis = viewAnalysisByFid.get(String(props.fid));
       const rows = [
-        ["동", props.dong],
-        ["타입", props.unit_type],
-        ["층수", props.floors],
-        ["기준각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
-        ["각도범위", analysis ? formatAngleRange(analysis.allOpenSummary) : "계산 전"],
+        ["구역", escapeHtml(props.zone || "")],
+        ["동", formatDong(props.dong)],
+        ["타입", formatUnitType(props.unit_type)],
+        ["최고층", formatFloorCount(props.floors)],
+        ["최대조망각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
+      const thStyle = "width:58px;min-width:58px;padding:4px 5px;white-space:nowrap;word-break:keep-all;";
+      const tdStyle = "padding:4px 5px;line-height:1.28;word-break:keep-all;";
       return `
-        <table class="cesium-infoBox-defaultTable">
+        <table class="cesium-infoBox-defaultTable" style="width:100%;border-collapse:collapse;font-size:70%;line-height:1.28;">
           <tbody>
-            ${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v ?? ""}</td></tr>`).join("")}
+            ${rows.map(([k, v]) => `<tr><th style="${thStyle}">${k}</th><td style="${tdStyle}">${v ?? ""}</td></tr>`).join("")}
           </tbody>
         </table>
       `;
@@ -1304,12 +1566,14 @@
       }
     }
 
-    async function loadGeoJson(input) {
+    async function loadGeoJson(input, loadedLabel = "") {
       if (unitsDataSource) {
         viewer.dataSources.remove(unitsDataSource, true);
         unitsDataSource = null;
       }
+      viewer.selectedEntity = undefined;
       clearOutlines();
+      clearSelectedSightLines();
       prepareFootprints(input);
       analyzeViews();
 
@@ -1336,10 +1600,15 @@
         const unitType = String(props.unit_type || "").trim();
         const typeLabel = unitType ? `${unitType}PY` : "";
         const cssColor = cssColorFromHex(props.fill_color, "#ef4444");
+        const zoneName = String(props.zone || props.source_zone || "").trim();
+        const filterKey = currentZoneId === "ALL" ? `${zoneName}:${unitType}` : unitType;
+        const legendLabel = currentZoneId === "ALL" && zoneName ? `${zoneName} ${unitType}PY` : `${unitType}PY`;
 
-        entity.name = `${props.dong || ""}동 ${props.unit_type || ""}`;
+        entity.name = `${zoneName ? `${zoneName} ` : ""}${props.dong || ""}동 ${props.unit_type || ""}`;
         entity.fidValue = props.fid;
         entity.unitType = unitType;
+        entity.filterKey = filterKey;
+        entity.zoneName = zoneName;
         entity.baseColor = fill;
         const matchingFootprint = footprints.find(f => String(f.fid) === String(props.fid));
         entity.positionForSight = matchingFootprint ? {
@@ -1354,9 +1623,9 @@
         entity.polygon.shadows = Cesium.ShadowMode.DISABLED;
         entity.polygon.closeTop = true;
         entity.polygon.closeBottom = true;
-        addSharpOutlineAndLabel(entity, finalHeight, typeLabel, unitType);
-        if (unitType && !legendMap.has(unitType)) {
-          legendMap.set(unitType, { unitType, color: cssColor });
+        addSharpOutlineAndLabel(entity, finalHeight, typeLabel, unitType, filterKey);
+        if (unitType && !legendMap.has(filterKey)) {
+          legendMap.set(filterKey, { filterKey, unitType, zoneName, label: legendLabel, color: cssColor });
         }
 
         validCount += 1;
@@ -1365,7 +1634,13 @@
 
       unitsDataSource = source;
       await viewer.dataSources.add(source);
-      buildLegend([...legendMap.values()].sort((a, b) => Number.parseFloat(a.unitType) - Number.parseFloat(b.unitType)));
+      loadedLegendItems = [...legendMap.values()].sort((a, b) => {
+        const zoneCompare = String(a.label).localeCompare(String(b.label), "ko");
+        const unitCompare = Number.parseFloat(a.unitType) - Number.parseFloat(b.unitType);
+        return currentZoneId === "ALL" ? zoneCompare : unitCompare;
+      });
+      currentFilter = "ALL";
+      buildDefaultLegend();
       applyUnitFilter(currentFilter);
       await viewer.zoomTo(source, new Cesium.HeadingPitchRange(
         Cesium.Math.toRadians(335),
@@ -1373,38 +1648,94 @@
         900
       ));
 
-      setStatus(`GeoJSON 로드 완료\n유닛 수: ${validCount}\n최대 높이: ${maxHeight.toFixed(1)} m\n${riverStatusText()}`);
+      const prefix = loadedLabel ? `${loadedLabel} 로드 완료` : "GeoJSON 로드 완료";
+      setStatus(`${prefix}\n유닛 수: ${validCount}\n최대 높이: ${maxHeight.toFixed(1)} m\n${riverStatusText()}`);
     }
 
-    async function loadDefaultGeoJson() {
-      try {
-        const response = await fetch("apgujeong_2_units.geojson", { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        await loadGeoJson(data);
-      } catch (error) {
-        setStatus(
-          "자동 로드 실패: apgujeong_2_units.geojson을 같은 폴더에 넣었는지 확인하세요.\n" +
-          "또는 아래 파일 선택으로 직접 불러오세요.\n" +
-          `오류: ${error.message}`
-        );
+    async function fetchGeoJson(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+      return response.json();
+    }
+
+    function cloneFeatureWithZone(feature, zoneId) {
+      const props = { ...(feature.properties || {}) };
+      const sourceFid = props.fid ?? "";
+      props.source_fid = sourceFid;
+      props.source_zone = zoneId;
+      props.fid = `${zoneId}-${sourceFid}`;
+      return {
+        type: "Feature",
+        properties: props,
+        geometry: feature.geometry
+      };
+    }
+
+    function combineFeatureCollections(collections) {
+      return {
+        type: "FeatureCollection",
+        features: collections.flatMap(({ data, zoneId }) =>
+          (data.features || []).map(feature => cloneFeatureWithZone(feature, zoneId))
+        )
+      };
+    }
+
+    function combineRiverCollections(collections) {
+      return {
+        type: "FeatureCollection",
+        features: collections.flatMap(({ data }) => data.features || [])
+      };
+    }
+
+    function setActiveZoneButton(zoneId) {
+      for (const button of document.querySelectorAll("[data-zone]")) {
+        button.classList.toggle("active", button.dataset.zone === zoneId);
       }
     }
 
-    async function loadRiverLine() {
+    async function loadZone(zoneId) {
+      const config = ZONE_CONFIGS[zoneId] || ZONE_CONFIGS["2"];
+      currentZoneId = zoneId;
+      setActiveZoneButton(zoneId);
+      setStatus(`${config.label} 데이터를 불러오는 중입니다.`);
       try {
-        const response = await fetch("hangang_line_zone2.geojson", { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        riverRawGeoJson = data;
-        recalculateViews("기본 한강라인 로드 완료");
+        let riverData;
+        let unitsData;
+
+        if (config.zoneIds) {
+          const zoneConfigs = config.zoneIds.map(id => ({ id, ...ZONE_CONFIGS[id] }));
+          const unitCollections = await Promise.all(
+            zoneConfigs.map(async item => ({
+              zoneId: item.id,
+              data: await fetchGeoJson(item.unitsUrl)
+            }))
+          );
+          const uniqueRiverUrls = [...new Set(zoneConfigs.map(item => item.riverUrl))];
+          const riverCollections = await Promise.all(
+            uniqueRiverUrls.map(async url => ({ data: await fetchGeoJson(url) }))
+          );
+          unitsData = combineFeatureCollections(unitCollections);
+          riverData = combineRiverCollections(riverCollections);
+        } else {
+          const [singleRiverData, singleUnitsData] = await Promise.all([
+            fetchGeoJson(config.riverUrl),
+            fetchGeoJson(config.unitsUrl)
+          ]);
+          unitsData = combineFeatureCollections([{ zoneId, data: singleUnitsData }]);
+          riverData = singleRiverData;
+        }
+
+        riverRawGeoJson = riverData;
+        lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
+        drawRiverLines();
+        await loadGeoJson(unitsData, config.label);
       } catch (error) {
-        setStatus(`한강 라인 로드 실패: ${error.message}`);
+        setStatus(`${config.label} 로드 실패: ${error.message}`);
       }
     }
 
     function applyVworldBaseMap() {
-      const key = PUBLIC_VWORLD_KEY.trim();
+      const key = readStoredVworldKey();
       if (!key) {
         setStatus("V-World 공개용 키가 없어 OSM 배경을 사용합니다.");
         return;
@@ -1470,13 +1801,37 @@
       });
     }
 
+    for (const button of document.querySelectorAll("[data-zone]")) {
+      button.addEventListener("click", () => {
+        loadZone(button.dataset.zone);
+      });
+    }
+
+    document.getElementById("rotateSelected").addEventListener("click", () => {
+      const center = getSelectedRotateCenter();
+      if (!center) {
+        setStatus("먼저 회전 기준으로 삼을 동/평형 매스를 클릭하세요.");
+        return;
+      }
+      startAutoRotate(center, cameraDistanceTo(center, 520));
+      setStatus("선택 위치 기준 자동회전을 시작했습니다.");
+    });
+
+    document.getElementById("rotateAll").addEventListener("click", () => {
+      startAutoRotate(APGUJEONG_ROTATE_CENTER, 1150);
+      setStatus("전체 배치 기준 자동회전을 시작했습니다.");
+    });
+
+    document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
+
     viewer.selectedEntityChanged.addEventListener((entity) => {
       drawSelectedSightLines(entity);
+      showLegendForSelectedEntity(entity);
     });
 
     setTimeout(applyVworldBaseMap, 300);
 
-    loadRiverLine().then(loadDefaultGeoJson);
+    loadZone(currentZoneId);
   </script>
 </body>
 </html>

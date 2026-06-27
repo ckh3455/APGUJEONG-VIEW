@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","name":"hangang_line_zone45","features":[{"type":"Feature","properties":{"fid":1,"zone":"4,5구역","line_name":"한강조망공통라인","use_for":"4,5구역","memo":"통합조망라인"},"geometry":{"type":"LineString","coordinates":[[127.03376260777215,37.53323025755011],[127.04227764102032,37.530920951749124]]}}]}
