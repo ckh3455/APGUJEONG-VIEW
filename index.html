@@ -1110,7 +1110,7 @@
       };
     }
 
-    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight = 0) {
       const openByDirection = {};
       const openRaysByDirection = {};
       const allOpenRays = [];
@@ -1125,10 +1125,9 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        if (profile.blockerHeight >= observerHeight) {
-          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
-          if (activeBlocker) {
-            blockingFloorSet.add(Math.round(activeBlocker.floors));
+        if (profile.blockers && profile.blockers.length) {
+          for (const blocker of profile.blockers) {
+            if (blocker.floors > 0) blockingFloorSet.add(Math.round(blocker.floors));
           }
           continue;
         }
@@ -1183,32 +1182,13 @@
 
     function buildFloorBands(footprint, candidateData) {
       const floorCount = Math.max(1, Math.round(footprint.floors || 1));
-      const bands = [];
-      let previous = null;
-
-      for (let floor = 1; floor <= floorCount; floor += 1) {
-        const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
-        const comparable = {
-          totalOpen: summary.totalOpen
-        };
-
-        if (!previous) {
-          previous = { start: floor, end: floor, comparable, summary };
-          continue;
-        }
-
-        const same = comparable.totalOpen === previous.comparable.totalOpen;
-
-        if (same) {
-          previous.end = floor;
-        } else {
-          bands.push(previous);
-          previous = { start: floor, end: floor, comparable, summary };
-        }
-      }
-
-      if (previous) bands.push(previous);
-      return bands;
+      const summary = summarizeFacadeCandidates(footprint, candidateData, 0);
+      return [{
+        start: 1,
+        end: floorCount,
+        comparable: { totalOpen: summary.totalOpen },
+        summary
+      }];
     }
 
     function clearSelectedSightLines() {
@@ -1364,11 +1344,7 @@
         const candidateData = collectFacadeCandidates(footprint);
         const floorBands = buildFloorBands(footprint, candidateData);
         const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
-        const facadeView = summarizeFacadeCandidates(
-          footprint,
-          candidateData,
-          floorEyeHeight(footprint, displayFloor)
-        );
+        const facadeView = summarizeFacadeCandidates(footprint, candidateData, 0);
         const totalOpen = facadeView.totalOpen;
         const grade = totalOpen >= 60 ? "전면 조망" :
           totalOpen >= 30 ? "양호한 부분 조망" :
@@ -1391,7 +1367,7 @@
           sampleCount: facadeView.sampleCount,
           floorBands,
           displayFloor,
-          displayEyeHeight: facadeView.observerHeight,
+          displayEyeHeight: null,
           blockers: facadeView.blockers.slice(0, 3),
           grade
         });
@@ -1737,7 +1713,7 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["최대조망각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["최대조망각", analysis ? `전층 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       const thStyle = "width:58px;min-width:58px;padding:4px 5px;white-space:nowrap;word-break:keep-all;";
