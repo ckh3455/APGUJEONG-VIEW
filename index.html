@@ -19,7 +19,7 @@
       z-index: 5;
       top: 14px;
       left: 14px;
-      width: 300px;
+      width: 640px;
       max-width: calc(100vw - 28px);
       padding: 9px;
       background: rgba(255, 255, 255, 0.94);
@@ -130,6 +130,64 @@
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-radius: 2px;
     }
+    .legend-detail-wrap {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.95fr);
+      gap: 8px;
+      align-items: start;
+      margin-top: 8px;
+    }
+    .legend-section,
+    .selection-detail {
+      min-width: 0;
+    }
+    .selection-detail {
+      overflow: hidden;
+      border-radius: 6px;
+      background: rgba(17, 24, 39, 0.86);
+      color: #f8fafc;
+      box-shadow: 0 5px 16px rgba(15, 23, 42, 0.22);
+    }
+    .selection-detail-title {
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .selection-detail-body {
+      max-height: 168px;
+      overflow: auto;
+      padding: 0;
+      font-size: 10px;
+    }
+    .selection-detail-empty {
+      padding: 10px 8px;
+      color: #cbd5e1;
+    }
+    .selection-detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .selection-detail-table th,
+    .selection-detail-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      vertical-align: top;
+    }
+    .selection-detail-table th {
+      width: 74px;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.06);
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .selection-detail-table td {
+      color: #ffffff;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
     .cesium-infoBox {
       width: 300px;
       max-width: 42vw;
@@ -226,6 +284,17 @@
         padding-right: 2px;
         gap: 3px;
       }
+      .legend-detail-wrap {
+        grid-template-columns: 1fr;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      .selection-detail {
+        display: block;
+      }
+      .selection-detail-body {
+        max-height: 14svh;
+      }
       .legend button {
         padding: 2px 5px;
         font-size: 8.5px;
@@ -299,6 +368,15 @@
       .legend {
         max-height: 96px;
       }
+      .legend-detail-wrap {
+        grid-template-columns: 1fr;
+      }
+      .selection-detail {
+        display: block;
+      }
+      .selection-detail-body {
+        max-height: 96px;
+      }
       .cesium-infoBox {
         left: auto !important;
         width: 330px !important;
@@ -333,9 +411,17 @@
       <button id="rotateAll" class="secondary">전체 자동회전</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
     </div>
-    <div class="row">
-      <label>평형 범례</label>
-      <div class="legend" id="legend"></div>
+    <div class="legend-detail-wrap">
+      <div class="legend-section">
+        <label>평형 범례</label>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="selection-detail" aria-live="polite">
+        <div class="selection-detail-title" id="selectionDetailTitle">선택 상세</div>
+        <div class="selection-detail-body" id="selectionDetailBody">
+          <div class="selection-detail-empty">유닛을 클릭하면 상세설명이 표시됩니다.</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -385,6 +471,8 @@
     };
     const statusEl = document.getElementById("status");
     const legendEl = document.getElementById("legend");
+    const selectionDetailTitleEl = document.getElementById("selectionDetailTitle");
+    const selectionDetailBodyEl = document.getElementById("selectionDetailBody");
     const riverExtendInput = document.getElementById("riverExtendMeters");
     const PUBLIC_VWORLD_KEY = "";
     const VWORLD_KEY_STORAGE = "apgujeong_vworld_key";
@@ -397,7 +485,7 @@
       sceneModePicker: true,
       baseLayerPicker: false,
       navigationHelpButton: false,
-      infoBox: true,
+      infoBox: false,
       selectionIndicator: true,
       sceneMode: Cesium.SceneMode.SCENE3D,
       baseLayer: false,
@@ -1027,11 +1115,11 @@
       return [...byAngle.values()].sort((a, b) => a.order - b.order);
     }
 
-    function firstBlockingBlocker(blockers, observerHeight) {
+    function firstBlockingBlocker(blockers) {
       return (blockers || [])
         .slice()
         .sort((a, b) => a.distance - b.distance)
-        .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
+        .find(blocker => blocker.floors > 0) || null;
     }
 
     function collectFacadeCandidates(footprint) {
@@ -1089,11 +1177,9 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        if (profile.blockerHeight >= observerHeight) {
-          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
-          if (activeBlocker) {
-            blockingFloorSet.add(Math.round(activeBlocker.floors));
-          }
+        const activeBlocker = firstBlockingBlocker(profile.blockers);
+        if (activeBlocker) {
+          blockingFloorSet.add(Math.round(activeBlocker.floors));
           continue;
         }
 
@@ -1697,19 +1783,17 @@
     function buildDescription(props) {
       const analysis = viewAnalysisByFid.get(String(props.fid));
       const rows = [
-        ["구역", escapeHtml(props.zone || "")],
+        ["구역", escapeHtml(props.zone || props.source_zone || "")],
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["최대조망각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["조망각", analysis ? `수평 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
-      const thStyle = "width:58px;min-width:58px;padding:4px 5px;white-space:nowrap;word-break:keep-all;";
-      const tdStyle = "padding:4px 5px;line-height:1.28;word-break:keep-all;";
       return `
-        <table class="cesium-infoBox-defaultTable" style="width:100%;border-collapse:collapse;font-size:70%;line-height:1.28;">
+        <table class="selection-detail-table">
           <tbody>
-            ${rows.map(([k, v]) => `<tr><th style="${thStyle}">${k}</th><td style="${tdStyle}">${v ?? ""}</td></tr>`).join("")}
+            ${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v ?? ""}</td></tr>`).join("")}
           </tbody>
         </table>
       `;
@@ -1722,6 +1806,19 @@
         props[name] = entity.properties[name].getValue(Cesium.JulianDate.now());
       }
       return props;
+    }
+
+    function updateSelectionDetails(entity) {
+      if (!selectionDetailTitleEl || !selectionDetailBodyEl) return;
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        selectionDetailTitleEl.textContent = "선택 상세";
+        selectionDetailBodyEl.innerHTML = '<div class="selection-detail-empty">유닛을 클릭하면 상세설명이 표시됩니다.</div>';
+        return;
+      }
+
+      const props = propsFromEntity(entity);
+      selectionDetailTitleEl.textContent = entity.name || "선택 상세";
+      selectionDetailBodyEl.innerHTML = buildDescription(props);
     }
 
     function refreshLoadedDescriptions() {
@@ -1755,6 +1852,7 @@
       setStatus(`${message}\n${riverStatusText()}\n유닛 수: ${footprints.length}`);
       if (viewer.selectedEntity) {
         drawSelectedSightLines(viewer.selectedEntity);
+        updateSelectionDetails(viewer.selectedEntity);
       }
     }
 
@@ -1764,6 +1862,7 @@
         unitsDataSource = null;
       }
       viewer.selectedEntity = undefined;
+      updateSelectionDetails(null);
       clearOutlines();
       clearSelectedSightLines();
       prepareFootprints(input);
@@ -2030,6 +2129,7 @@
     viewer.selectedEntityChanged.addEventListener((entity) => {
       drawSelectedSightLines(entity);
       showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
