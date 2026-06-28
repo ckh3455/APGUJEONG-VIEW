@@ -143,11 +143,11 @@
       width: 330px;
       max-width: calc(100vw - 344px);
       max-height: calc(100vh - 28px);
+      z-index: 6;
     }
     .cesium-infoBox {
-      position: relative !important;
-      top: auto !important;
-      left: auto !important;
+      top: 0 !important;
+      left: 0 !important;
       right: auto !important;
       bottom: auto !important;
       width: 100% !important;
@@ -268,8 +268,11 @@
         width: auto !important;
         max-width: none !important;
         max-height: 44svh !important;
+        z-index: 6;
       }
       .cesium-infoBox {
+        top: 0 !important;
+        left: 0 !important;
         width: 100% !important;
         max-width: none !important;
         max-height: 44svh !important;
@@ -1744,6 +1747,15 @@
       }
     }
 
+    function ensureSelectedDescription(entity) {
+      if (!entity || !entity.polygon) return;
+      entity.description = buildDescription(propsFromEntity(entity));
+      const container = document.querySelector(".cesium-viewer-infoBoxContainer");
+      if (container) container.style.display = "";
+      const infoBox = document.querySelector(".cesium-infoBox");
+      if (infoBox) infoBox.style.display = "";
+    }
+
     function riverStatusText() {
       if (!lastRiverStats) return "한강라인: 미로드";
       return [
@@ -2040,6 +2052,7 @@
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
 
     viewer.selectedEntityChanged.addEventListener((entity) => {
+      ensureSelectedDescription(entity);
       drawSelectedSightLines(entity);
       showLegendForSelectedEntity(entity);
     });
