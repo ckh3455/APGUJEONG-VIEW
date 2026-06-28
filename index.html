@@ -672,6 +672,8 @@
     const METERS_PER_DEG_LAT = 110540;
     const METERS_PER_DEG_LON = 111320 * Math.cos(Cesium.Math.toRadians(ORIGIN_LAT));
     const EXTERIOR_HULL_TOLERANCE_M = 8;
+    const FACADE_SAMPLE_STEP_M = 2;
+    const CITY_VIEW_DISTANCE_M = 1200;
 
     function lonLatToXY(lon, lat) {
       return {
@@ -702,6 +704,14 @@
     function bearingTo(from, to) {
       const angle = Cesium.Math.toDegrees(Math.atan2(to.x - from.x, to.y - from.y));
       return (angle + 360) % 360;
+    }
+
+    function pointFromBearing(origin, bearing, meters) {
+      const rad = Cesium.Math.toRadians(bearing);
+      return {
+        x: origin.x + Math.sin(rad) * meters,
+        y: origin.y + Math.cos(rad) * meters
+      };
     }
 
     function normalizeAngle(degrees) {
@@ -1122,8 +1132,40 @@
         .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
     }
 
+    function collectCityCandidates(footprint, samples) {
+      const candidates = [];
+
+      for (const sample of samples) {
+        for (let angle = 0; angle < 360; angle += 1) {
+          const end = pointFromBearing(sample.point, angle, CITY_VIEW_DISTANCE_M);
+          if (!viewRayLeavesBuilding(sample.point, end, footprint)) continue;
+
+          const riverHit = nearestRayHit(sample.point, angle, riverSegments);
+          if (riverHit && riverHit.distance > 2 && riverHit.distance < CITY_VIEW_DISTANCE_M) continue;
+
+          const blockerProfile = rayBlockerProfile(sample.point, angle, CITY_VIEW_DISTANCE_M, footprint);
+          if (blockerProfile.internalBlocked) continue;
+
+          candidates.push({
+            angle,
+            distance: CITY_VIEW_DISTANCE_M,
+            origin: sample.point,
+            end,
+            blockerHeight: blockerProfile.maxBlockerHeight,
+            blockers: blockerProfile.blockers,
+            sample
+          });
+        }
+      }
+
+      return {
+        candidates,
+        angleProfiles: buildAngleProfiles(candidates)
+      };
+    }
+
     function collectFacadeCandidates(footprint) {
-      const samples = sampleFacadeSegments(footprint, 5);
+      const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
       const blockers = new Map();
       const candidates = [];
 
@@ -1158,11 +1200,12 @@
         samples,
         candidates,
         angleProfiles: buildAngleProfiles(candidates),
+        cityAngleProfiles: collectCityCandidates(footprint, samples).angleProfiles,
         blockers: [...blockers.values()].sort((a, b) => a.distance - b.distance)
       };
     }
 
-    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight, profileKey = "angleProfiles") {
       const openByDirection = {};
       const openRaysByDirection = {};
       const allOpenRays = [];
@@ -1170,10 +1213,11 @@
       const visibleFacadeSegments = [];
       const visibleSamples = new Set();
       const blockingFloorSet = new Set();
+      const blockingBlockers = new Map();
       let visibleFacadeLength = 0;
       let visibleSampleCount = 0;
 
-      const angleProfiles = candidateData.angleProfiles || buildAngleProfiles(candidateData.candidates || []);
+      const angleProfiles = candidateData[profileKey] || [];
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
@@ -1181,6 +1225,8 @@
           const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
           if (activeBlocker) {
             blockingFloorSet.add(Math.round(activeBlocker.floors));
+            const key = `${activeBlocker.zoneName || ""}:${activeBlocker.dong || ""}`;
+            if (!blockingBlockers.has(key)) blockingBlockers.set(key, activeBlocker);
           }
           continue;
         }
@@ -1229,6 +1275,7 @@
         visibleSampleCount,
         sampleCount: candidateData.samples.length,
         blockingFloors: [...blockingFloorSet].sort((a, b) => a - b),
+        blockingBlockers: [...blockingBlockers.values()].sort((a, b) => a.distance - b.distance),
         blockers: candidateData.blockers
       };
     }
@@ -1240,22 +1287,25 @@
 
       for (let floor = 1; floor <= floorCount; floor += 1) {
         const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
+        const citySummary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor), "cityAngleProfiles");
         const comparable = {
-          totalOpen: summary.totalOpen
+          totalOpen: summary.totalOpen,
+          cityOpen: citySummary.totalOpen
         };
 
         if (!previous) {
-          previous = { start: floor, end: floor, comparable, summary };
+          previous = { start: floor, end: floor, comparable, summary, citySummary };
           continue;
         }
 
-        const same = comparable.totalOpen === previous.comparable.totalOpen;
+        const same = comparable.totalOpen === previous.comparable.totalOpen &&
+          comparable.cityOpen === previous.comparable.cityOpen;
 
         if (same) {
           previous.end = floor;
         } else {
           bands.push(previous);
-          previous = { start: floor, end: floor, comparable, summary };
+          previous = { start: floor, end: floor, comparable, summary, citySummary };
         }
       }
 
@@ -1421,6 +1471,12 @@
           candidateData,
           floorEyeHeight(footprint, displayFloor)
         );
+        const cityView = summarizeFacadeCandidates(
+          footprint,
+          candidateData,
+          floorEyeHeight(footprint, displayFloor),
+          "cityAngleProfiles"
+        );
         const totalOpen = facadeView.totalOpen;
         const grade = totalOpen >= 60 ? "전면 조망" :
           totalOpen >= 30 ? "양호한 부분 조망" :
@@ -1437,6 +1493,9 @@
           allOpenSummary: facadeView.allOpenSummary,
           allOpenRays: facadeView.allOpenRays,
           totalOpen,
+          cityOpen: cityView.totalOpen,
+          cityOpenSummary: cityView.allOpenSummary,
+          cityOpenRays: cityView.allOpenRays,
           visibleFacadeLength: facadeView.visibleFacadeLength,
           visibleFacadeSegments: facadeView.visibleFacadeSegments,
           visibleSampleCount: facadeView.visibleSampleCount,
@@ -1762,8 +1821,20 @@
       return ["#60a5fa", "#34d399", "#fbbf24", "#fb7185"][index % 4];
     }
 
-    function formatFloorBandItem(label, angle, index) {
-      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(angle)}도</span>`;
+    function formatBlockerNames(blockers) {
+      const names = (blockers || [])
+        .map(blocker => `${blocker.zoneName ? `${blocker.zoneName} ` : ""}${blocker.dong || ""}동`)
+        .filter(Boolean);
+      const unique = [...new Set(names)];
+      if (!unique.length) return "";
+      const visible = unique.slice(0, 3).join(", ");
+      return unique.length > 3 ? `${visible} 외 ${unique.length - 3}` : visible;
+    }
+
+    function formatFloorBandItem(label, riverAngle, cityAngle, blockers, index) {
+      const blockerText = formatBlockerNames(blockers);
+      const blockerHtml = blockerText ? ` <span style="color:#fca5a5;">차폐 ${escapeHtml(blockerText)}</span>` : "";
+      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} 한강 ${Math.round(riverAngle)}도 / 시티 ${Math.round(cityAngle)}도${blockerHtml}</span>`;
     }
 
     function formatFloorBands(analysis) {
@@ -1772,12 +1843,19 @@
       const bands = analysis.floorBands;
       if (bands.length === 1) {
         const only = bands[0];
-        return formatFloorBandItem("전층", only.summary.totalOpen, 0);
+        return formatFloorBandItem(
+          "전층",
+          only.summary.totalOpen,
+          only.citySummary ? only.citySummary.totalOpen : 0,
+          only.summary.blockingBlockers,
+          0
+        );
       }
       const items = bands.map((band, index) => {
         const label = formatFloorBandLabel(band, floorCount);
-        const angle = band.summary.totalOpen;
-        return formatFloorBandItem(label, angle, index);
+        const riverAngle = band.summary.totalOpen;
+        const cityAngle = band.citySummary ? band.citySummary.totalOpen : 0;
+        return formatFloorBandItem(label, riverAngle, cityAngle, band.summary.blockingBlockers, index);
       });
       return items.join("");
     }
@@ -1789,7 +1867,8 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["조망각", analysis ? `한강라인 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["한강조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
+        ["시티뷰각", analysis ? `${analysis.cityOpen || 0}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       return `
