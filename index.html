@@ -1115,11 +1115,11 @@
       return [...byAngle.values()].sort((a, b) => a.order - b.order);
     }
 
-    function firstBlockingBlocker(blockers) {
+    function firstBlockingBlocker(blockers, observerHeight) {
       return (blockers || [])
         .slice()
         .sort((a, b) => a.distance - b.distance)
-        .find(blocker => blocker.floors > 0) || null;
+        .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
     }
 
     function collectFacadeCandidates(footprint) {
@@ -1177,9 +1177,11 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        const activeBlocker = firstBlockingBlocker(profile.blockers);
-        if (activeBlocker) {
-          blockingFloorSet.add(Math.round(activeBlocker.floors));
+        if (profile.blockerHeight >= observerHeight) {
+          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
+          if (activeBlocker) {
+            blockingFloorSet.add(Math.round(activeBlocker.floors));
+          }
           continue;
         }
 
@@ -1787,7 +1789,7 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["조망각", analysis ? `수평 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["조망각", analysis ? `한강라인 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       return `
