@@ -143,11 +143,11 @@
       width: 330px;
       max-width: calc(100vw - 344px);
       max-height: calc(100vh - 28px);
-      z-index: 6;
     }
     .cesium-infoBox {
-      top: 0 !important;
-      left: 0 !important;
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
       right: auto !important;
       bottom: auto !important;
       width: 100% !important;
@@ -268,11 +268,8 @@
         width: auto !important;
         max-width: none !important;
         max-height: 44svh !important;
-        z-index: 6;
       }
       .cesium-infoBox {
-        top: 0 !important;
-        left: 0 !important;
         width: 100% !important;
         max-width: none !important;
         max-height: 44svh !important;
@@ -377,6 +374,7 @@
       <div class="legend" id="legend"></div>
     </div>
   </div>
+
   <script>
     Cesium.Ion.defaultAccessToken = "";
 
@@ -1112,7 +1110,7 @@
       };
     }
 
-    function summarizeFacadeCandidates(footprint, candidateData, observerHeight = 0) {
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
       const openByDirection = {};
       const openRaysByDirection = {};
       const allOpenRays = [];
@@ -1127,9 +1125,10 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        if (profile.blockers && profile.blockers.length) {
-          for (const blocker of profile.blockers) {
-            if (blocker.floors > 0) blockingFloorSet.add(Math.round(blocker.floors));
+        if (profile.blockerHeight >= observerHeight) {
+          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
+          if (activeBlocker) {
+            blockingFloorSet.add(Math.round(activeBlocker.floors));
           }
           continue;
         }
@@ -1184,13 +1183,32 @@
 
     function buildFloorBands(footprint, candidateData) {
       const floorCount = Math.max(1, Math.round(footprint.floors || 1));
-      const summary = summarizeFacadeCandidates(footprint, candidateData, 0);
-      return [{
-        start: 1,
-        end: floorCount,
-        comparable: { totalOpen: summary.totalOpen },
-        summary
-      }];
+      const bands = [];
+      let previous = null;
+
+      for (let floor = 1; floor <= floorCount; floor += 1) {
+        const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
+        const comparable = {
+          totalOpen: summary.totalOpen
+        };
+
+        if (!previous) {
+          previous = { start: floor, end: floor, comparable, summary };
+          continue;
+        }
+
+        const same = comparable.totalOpen === previous.comparable.totalOpen;
+
+        if (same) {
+          previous.end = floor;
+        } else {
+          bands.push(previous);
+          previous = { start: floor, end: floor, comparable, summary };
+        }
+      }
+
+      if (previous) bands.push(previous);
+      return bands;
     }
 
     function clearSelectedSightLines() {
@@ -1346,7 +1364,11 @@
         const candidateData = collectFacadeCandidates(footprint);
         const floorBands = buildFloorBands(footprint, candidateData);
         const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
-        const facadeView = summarizeFacadeCandidates(footprint, candidateData, 0);
+        const facadeView = summarizeFacadeCandidates(
+          footprint,
+          candidateData,
+          floorEyeHeight(footprint, displayFloor)
+        );
         const totalOpen = facadeView.totalOpen;
         const grade = totalOpen >= 60 ? "전면 조망" :
           totalOpen >= 30 ? "양호한 부분 조망" :
@@ -1369,7 +1391,7 @@
           sampleCount: facadeView.sampleCount,
           floorBands,
           displayFloor,
-          displayEyeHeight: null,
+          displayEyeHeight: facadeView.observerHeight,
           blockers: facadeView.blockers.slice(0, 3),
           grade
         });
@@ -1436,7 +1458,6 @@
       const bottomOutline = viewer.entities.add({
         name: `${entity.name} 외곽선`,
         unitType: filterKey,
-        sourceUnitEntity: entity,
         polyline: {
           positions,
           width: 1,
@@ -1444,13 +1465,11 @@
           clampToGround: false
         }
       });
-      bottomOutline.sourceUnitEntity = entity;
       overlayEntities.push(bottomOutline);
 
       const topOutline = viewer.entities.add({
         name: `${entity.name} 상단 외곽선`,
         unitType: filterKey,
-        sourceUnitEntity: entity,
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArrayHeights(topDegrees),
           width: 1,
@@ -1458,7 +1477,6 @@
           clampToGround: false
         }
       });
-      topOutline.sourceUnitEntity = entity;
       overlayEntities.push(topOutline);
 
       const groundPositions = hierarchy.positions;
@@ -1468,7 +1486,6 @@
         const lat = Cesium.Math.toDegrees(cartographic.latitude);
         const sideOutline = viewer.entities.add({
           unitType: filterKey,
-          sourceUnitEntity: entity,
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArrayHeights([
               lon, lat, 0,
@@ -1479,7 +1496,6 @@
               clampToGround: false
             }
         });
-        sideOutline.sourceUnitEntity = entity;
         overlayEntities.push(sideOutline);
       }
 
@@ -1487,7 +1503,6 @@
         const labelEntity = viewer.entities.add({
           name: `${entity.name} 라벨`,
           unitType: filterKey,
-          sourceUnitEntity: entity,
           position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height + 2),
           label: {
             text: labelText,
@@ -1503,7 +1518,6 @@
             scaleByDistance: new Cesium.NearFarScalar(250, 1.15, 3000, 0.45)
           }
         });
-        labelEntity.sourceUnitEntity = entity;
         overlayEntities.push(labelEntity);
       }
     }
@@ -1723,7 +1737,7 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["최대조망각", analysis ? `전층 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["최대조망각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       const thStyle = "width:58px;min-width:58px;padding:4px 5px;white-space:nowrap;word-break:keep-all;";
@@ -1752,12 +1766,6 @@
         if (!entity.polygon) continue;
         entity.description = buildDescription(propsFromEntity(entity));
       }
-    }
-
-    function resolveUnitEntity(entity) {
-      if (!entity) return null;
-      if (entity.polygon) return entity;
-      return entity.sourceUnitEntity || null;
     }
 
     function riverStatusText() {
@@ -2056,14 +2064,8 @@
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
 
     viewer.selectedEntityChanged.addEventListener((entity) => {
-      const unitEntity = resolveUnitEntity(entity);
-      if (unitEntity && unitEntity !== entity) {
-        viewer.selectedEntity = unitEntity;
-        return;
-      }
-      if (unitEntity) unitEntity.description = buildDescription(propsFromEntity(unitEntity));
-      drawSelectedSightLines(unitEntity);
-      showLegendForSelectedEntity(unitEntity);
+      drawSelectedSightLines(entity);
+      showLegendForSelectedEntity(entity);
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
