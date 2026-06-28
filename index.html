@@ -19,7 +19,7 @@
       z-index: 5;
       top: 14px;
       left: 14px;
-      width: 300px;
+      width: 286px;
       max-width: calc(100vw - 28px);
       padding: 9px;
       background: rgba(255, 255, 255, 0.94);
@@ -28,6 +28,8 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
       font-size: 11px;
       line-height: 1.35;
+      max-height: calc(100vh - 28px);
+      overflow-y: auto;
     }
     .panel h1 {
       margin: 0 0 6px;
@@ -72,17 +74,20 @@
       gap: 6px;
       margin-top: 8px;
     }
-    .zone-tabs {
+    .zone-tabs,
+    .map-tabs {
       display: flex;
       gap: 5px;
       margin-top: 8px;
     }
-    .zone-tabs button {
+    .zone-tabs button,
+    .map-tabs button {
       flex: 1;
       background: #e2e8f0;
       color: #1e293b;
     }
-    .zone-tabs button.active {
+    .zone-tabs button.active,
+    .map-tabs button.active {
       background: #2563eb;
       color: #ffffff;
     }
@@ -104,6 +109,9 @@
       flex-wrap: wrap;
       gap: 4px;
       margin-top: 6px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 2px;
     }
     .legend button {
       display: inline-flex;
@@ -127,14 +135,33 @@
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-radius: 2px;
     }
+    .cesium-viewer-infoBoxContainer {
+      top: 14px !important;
+      left: 324px !important;
+      right: auto !important;
+      bottom: auto !important;
+      width: 330px;
+      max-width: calc(100vw - 344px);
+      max-height: calc(100vh - 28px);
+      z-index: 6;
+    }
     .cesium-infoBox {
-      width: 300px;
-      max-width: 42vw;
+      top: 0 !important;
+      left: 0 !important;
+      right: auto !important;
+      bottom: auto !important;
+      width: 100% !important;
+      max-width: none !important;
+      max-height: calc(100vh - 28px);
       font-size: 70%;
     }
     .cesium-infoBox-title {
       font-size: 14px;
       line-height: 1.25;
+    }
+    .cesium-infoBox-body {
+      max-height: calc(100vh - 76px);
+      overflow: auto;
     }
     .cesium-infoBox-defaultTable th {
       width: 58px;
@@ -169,6 +196,158 @@
     .floor-band-3 {
       color: #fb7185;
     }
+    @media (max-width: 768px) {
+      .panel {
+        top: 8px;
+        left: 8px;
+        right: auto;
+        width: calc(50vw - 12px);
+        max-width: none;
+        max-height: 44svh;
+        overflow-y: auto;
+        padding: 6px;
+        font-size: 9px;
+      }
+      .panel h1 {
+        margin-bottom: 3px;
+        font-size: 11px;
+      }
+      .hint {
+        display: none;
+      }
+      .zone-tabs,
+      .map-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .map-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .zone-tabs button,
+      .map-tabs button,
+      .buttons button {
+        min-height: 27px;
+        padding: 4px 3px;
+        border-radius: 5px;
+        font-size: 10px;
+        line-height: 1.15;
+      }
+      .buttons {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .row {
+        gap: 3px;
+        margin-top: 5px;
+      }
+      .legend {
+        max-height: 14svh;
+        overflow-y: auto;
+        padding-right: 2px;
+        gap: 3px;
+      }
+      .legend button {
+        padding: 2px 5px;
+        font-size: 8.5px;
+        gap: 3px;
+        line-height: 1.15;
+      }
+      .swatch {
+        width: 7px;
+        height: 7px;
+      }
+      .cesium-viewer-infoBoxContainer {
+        top: 8px !important;
+        left: calc(50vw + 4px) !important;
+        right: 8px !important;
+        bottom: auto !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: 44svh !important;
+        z-index: 6;
+      }
+      .cesium-infoBox {
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        max-height: 44svh !important;
+        font-size: 50% !important;
+      }
+      .cesium-infoBox-title {
+        min-height: 26px;
+        padding: 6px 28px 5px 8px;
+        font-size: 10px !important;
+        line-height: 1.25;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(44svh - 34px) !important;
+        overflow: auto !important;
+      }
+      .cesium-infoBox-defaultTable th {
+        width: 34px;
+        min-width: 34px;
+      }
+      .cesium-infoBox-defaultTable td {
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .floor-change {
+        gap: 2px 6px;
+      }
+    }
+    @media (max-width: 480px) {
+      .panel {
+        width: calc(50vw - 10px);
+        max-height: 45svh;
+      }
+      .zone-tabs button,
+      .map-tabs button,
+      .buttons button {
+        min-height: 25px;
+        font-size: 9px;
+      }
+      .legend {
+        max-height: 13svh;
+      }
+      .cesium-viewer-infoBoxContainer {
+        left: calc(50vw + 2px) !important;
+        max-height: 45svh !important;
+      }
+      .cesium-infoBox {
+        max-height: 45svh !important;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(45svh - 34px) !important;
+      }
+    }
+    @media (max-width: 900px) and (orientation: landscape) {
+      .panel {
+        right: auto;
+        width: 320px;
+        max-height: calc(100svh - 24px);
+      }
+      .legend {
+        max-height: 96px;
+      }
+      .cesium-viewer-infoBoxContainer {
+        left: auto !important;
+        width: 330px !important;
+        max-height: calc(100svh - 86px) !important;
+        bottom: 14px !important;
+      }
+      .cesium-infoBox {
+        width: 100% !important;
+        max-height: calc(100svh - 86px) !important;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(100svh - 134px) !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -183,6 +362,11 @@
       <button type="button" data-zone="4">4구역</button>
       <button type="button" data-zone="5">5구역</button>
     </div>
+    <div class="map-tabs" aria-label="배경지도 선택">
+      <button type="button" class="active" data-map="street">도로지도</button>
+      <button type="button" data-map="light">밝은지도</button>
+      <button type="button" data-map="satellite">위성지도</button>
+    </div>
     <div class="buttons">
       <button id="rotateSelected" class="secondary">선택 위치 자동회전</button>
       <button id="rotateAll" class="secondary">전체 자동회전</button>
@@ -193,7 +377,6 @@
       <div class="legend" id="legend"></div>
     </div>
   </div>
-
   <script>
     Cesium.Ion.defaultAccessToken = "";
 
@@ -221,6 +404,23 @@
         riverUrl: "hangang_line_zone45.geojson"
       }
     };
+    const MAP_CONFIGS = {
+      street: {
+        label: "도로지도",
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        credit: "OpenStreetMap"
+      },
+      light: {
+        label: "밝은지도",
+        url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        credit: "CARTO, OpenStreetMap"
+      },
+      satellite: {
+        label: "위성지도",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        credit: "Esri World Imagery"
+      }
+    };
     const statusEl = document.getElementById("status");
     const legendEl = document.getElementById("legend");
     const riverExtendInput = document.getElementById("riverExtendMeters");
@@ -238,9 +438,7 @@
       infoBox: true,
       selectionIndicator: true,
       sceneMode: Cesium.SceneMode.SCENE3D,
-      imageryProvider: new Cesium.OpenStreetMapImageryProvider({
-        url: "https://tile.openstreetmap.org/"
-      }),
+      baseLayer: false,
       terrainProvider: new Cesium.EllipsoidTerrainProvider()
     });
 
@@ -281,6 +479,7 @@
 
     let unitsDataSource = null;
     let vworldLayer = null;
+    let publicBaseLayer = null;
     const overlayEntities = [];
     const selectedSightEntities = [];
     const riverLineEntities = [];
@@ -303,6 +502,37 @@
 
     function setStatus(message) {
       if (statusEl) statusEl.textContent = message;
+    }
+
+    function setActiveMapButton(mapId) {
+      for (const button of document.querySelectorAll("[data-map]")) {
+        button.classList.toggle("active", button.dataset.map === mapId);
+      }
+    }
+
+    function applyPublicBaseMap(mapId = "street") {
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
+      }
+
+      if (vworldLayer) {
+        viewer.imageryLayers.remove(vworldLayer, true);
+        vworldLayer = null;
+      }
+
+      const config = MAP_CONFIGS[mapId] || MAP_CONFIGS.street;
+      const provider = new Cesium.UrlTemplateImageryProvider({
+        url: config.url,
+        minimumLevel: 0,
+        maximumLevel: 19,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        credit: config.credit
+      });
+
+      publicBaseLayer = viewer.imageryLayers.addImageryProvider(provider, 0);
+      setActiveMapButton(mapId);
+      setStatus(`${config.label} 배경을 적용했습니다.`);
     }
 
     function readStoredVworldKey() {
@@ -882,7 +1112,7 @@
       };
     }
 
-    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight = 0) {
       const openByDirection = {};
       const openRaysByDirection = {};
       const allOpenRays = [];
@@ -897,10 +1127,9 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        if (profile.blockerHeight >= observerHeight) {
-          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
-          if (activeBlocker) {
-            blockingFloorSet.add(Math.round(activeBlocker.floors));
+        if (profile.blockers && profile.blockers.length) {
+          for (const blocker of profile.blockers) {
+            if (blocker.floors > 0) blockingFloorSet.add(Math.round(blocker.floors));
           }
           continue;
         }
@@ -955,32 +1184,13 @@
 
     function buildFloorBands(footprint, candidateData) {
       const floorCount = Math.max(1, Math.round(footprint.floors || 1));
-      const bands = [];
-      let previous = null;
-
-      for (let floor = 1; floor <= floorCount; floor += 1) {
-        const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
-        const comparable = {
-          totalOpen: summary.totalOpen
-        };
-
-        if (!previous) {
-          previous = { start: floor, end: floor, comparable, summary };
-          continue;
-        }
-
-        const same = comparable.totalOpen === previous.comparable.totalOpen;
-
-        if (same) {
-          previous.end = floor;
-        } else {
-          bands.push(previous);
-          previous = { start: floor, end: floor, comparable, summary };
-        }
-      }
-
-      if (previous) bands.push(previous);
-      return bands;
+      const summary = summarizeFacadeCandidates(footprint, candidateData, 0);
+      return [{
+        start: 1,
+        end: floorCount,
+        comparable: { totalOpen: summary.totalOpen },
+        summary
+      }];
     }
 
     function clearSelectedSightLines() {
@@ -1136,11 +1346,7 @@
         const candidateData = collectFacadeCandidates(footprint);
         const floorBands = buildFloorBands(footprint, candidateData);
         const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
-        const facadeView = summarizeFacadeCandidates(
-          footprint,
-          candidateData,
-          floorEyeHeight(footprint, displayFloor)
-        );
+        const facadeView = summarizeFacadeCandidates(footprint, candidateData, 0);
         const totalOpen = facadeView.totalOpen;
         const grade = totalOpen >= 60 ? "전면 조망" :
           totalOpen >= 30 ? "양호한 부분 조망" :
@@ -1163,7 +1369,7 @@
           sampleCount: facadeView.sampleCount,
           floorBands,
           displayFloor,
-          displayEyeHeight: facadeView.observerHeight,
+          displayEyeHeight: null,
           blockers: facadeView.blockers.slice(0, 3),
           grade
         });
@@ -1230,6 +1436,7 @@
       const bottomOutline = viewer.entities.add({
         name: `${entity.name} 외곽선`,
         unitType: filterKey,
+        sourceUnitEntity: entity,
         polyline: {
           positions,
           width: 1,
@@ -1237,11 +1444,13 @@
           clampToGround: false
         }
       });
+      bottomOutline.sourceUnitEntity = entity;
       overlayEntities.push(bottomOutline);
 
       const topOutline = viewer.entities.add({
         name: `${entity.name} 상단 외곽선`,
         unitType: filterKey,
+        sourceUnitEntity: entity,
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArrayHeights(topDegrees),
           width: 1,
@@ -1249,6 +1458,7 @@
           clampToGround: false
         }
       });
+      topOutline.sourceUnitEntity = entity;
       overlayEntities.push(topOutline);
 
       const groundPositions = hierarchy.positions;
@@ -1258,6 +1468,7 @@
         const lat = Cesium.Math.toDegrees(cartographic.latitude);
         const sideOutline = viewer.entities.add({
           unitType: filterKey,
+          sourceUnitEntity: entity,
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArrayHeights([
               lon, lat, 0,
@@ -1268,6 +1479,7 @@
               clampToGround: false
             }
         });
+        sideOutline.sourceUnitEntity = entity;
         overlayEntities.push(sideOutline);
       }
 
@@ -1275,6 +1487,7 @@
         const labelEntity = viewer.entities.add({
           name: `${entity.name} 라벨`,
           unitType: filterKey,
+          sourceUnitEntity: entity,
           position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height + 2),
           label: {
             text: labelText,
@@ -1290,6 +1503,7 @@
             scaleByDistance: new Cesium.NearFarScalar(250, 1.15, 3000, 0.45)
           }
         });
+        labelEntity.sourceUnitEntity = entity;
         overlayEntities.push(labelEntity);
       }
     }
@@ -1509,7 +1723,7 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
-        ["최대조망각", analysis ? `${analysis.displayFloor}층 기준 ${analysis.totalOpen}도` : "계산 전"],
+        ["최대조망각", analysis ? `전층 기준 ${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       const thStyle = "width:58px;min-width:58px;padding:4px 5px;white-space:nowrap;word-break:keep-all;";
@@ -1538,6 +1752,12 @@
         if (!entity.polygon) continue;
         entity.description = buildDescription(propsFromEntity(entity));
       }
+    }
+
+    function resolveUnitEntity(entity) {
+      if (!entity) return null;
+      if (entity.polygon) return entity;
+      return entity.sourceUnitEntity || null;
     }
 
     function riverStatusText() {
@@ -1737,12 +1957,16 @@
     function applyVworldBaseMap() {
       const key = readStoredVworldKey();
       if (!key) {
-        setStatus("V-World 공개용 키가 없어 OSM 배경을 사용합니다.");
+        applyPublicBaseMap("street");
         return;
       }
 
       if (vworldLayer) {
         viewer.imageryLayers.remove(vworldLayer, true);
+      }
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
       }
 
       const provider = new Cesium.UrlTemplateImageryProvider({
@@ -1755,6 +1979,7 @@
 
       vworldLayer = viewer.imageryLayers.addImageryProvider(provider);
       viewer.imageryLayers.lowerToBottom(vworldLayer);
+      setActiveMapButton("");
       setStatus("V-World 위성 배경 적용 시도 완료.");
     }
 
@@ -1807,6 +2032,12 @@
       });
     }
 
+    for (const button of document.querySelectorAll("[data-map]")) {
+      button.addEventListener("click", () => {
+        applyPublicBaseMap(button.dataset.map);
+      });
+    }
+
     document.getElementById("rotateSelected").addEventListener("click", () => {
       const center = getSelectedRotateCenter();
       if (!center) {
@@ -1825,11 +2056,17 @@
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
 
     viewer.selectedEntityChanged.addEventListener((entity) => {
-      drawSelectedSightLines(entity);
-      showLegendForSelectedEntity(entity);
+      const unitEntity = resolveUnitEntity(entity);
+      if (unitEntity && unitEntity !== entity) {
+        viewer.selectedEntity = unitEntity;
+        return;
+      }
+      if (unitEntity) unitEntity.description = buildDescription(propsFromEntity(unitEntity));
+      drawSelectedSightLines(unitEntity);
+      showLegendForSelectedEntity(unitEntity);
     });
 
-    setTimeout(applyVworldBaseMap, 300);
+    setTimeout(() => applyPublicBaseMap("street"), 300);
 
     loadZone(currentZoneId);
   </script>
