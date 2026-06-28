@@ -671,9 +671,8 @@
     const ORIGIN_LAT = 37.52545;
     const METERS_PER_DEG_LAT = 110540;
     const METERS_PER_DEG_LON = 111320 * Math.cos(Cesium.Math.toRadians(ORIGIN_LAT));
-    const EXTERIOR_HULL_TOLERANCE_M = 8;
+    const EXTERIOR_HULL_TOLERANCE_M = 2;
     const FACADE_SAMPLE_STEP_M = 2;
-    const CITY_VIEW_DISTANCE_M = 1200;
 
     function lonLatToXY(lon, lat) {
       return {
@@ -704,14 +703,6 @@
     function bearingTo(from, to) {
       const angle = Cesium.Math.toDegrees(Math.atan2(to.x - from.x, to.y - from.y));
       return (angle + 360) % 360;
-    }
-
-    function pointFromBearing(origin, bearing, meters) {
-      const rad = Cesium.Math.toRadians(bearing);
-      return {
-        x: origin.x + Math.sin(rad) * meters,
-        y: origin.y + Math.cos(rad) * meters
-      };
     }
 
     function normalizeAngle(degrees) {
@@ -1026,6 +1017,15 @@
       return best;
     }
 
+    function rayReachesRiver(origin, bearing, expectedDistance) {
+      const hit = nearestRayHit(origin, bearing, riverSegments);
+      if (!hit || !Number.isFinite(hit.distance)) return false;
+      if (Number.isFinite(expectedDistance)) {
+        return Math.abs(hit.distance - expectedDistance) <= 2.5;
+      }
+      return hit.distance > 2;
+    }
+
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
       let internalBlocked = false;
       const hits = [];
@@ -1132,38 +1132,6 @@
         .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
     }
 
-    function collectCityCandidates(footprint, samples) {
-      const candidates = [];
-
-      for (const sample of samples) {
-        for (let angle = 0; angle < 360; angle += 1) {
-          const end = pointFromBearing(sample.point, angle, CITY_VIEW_DISTANCE_M);
-          if (!viewRayLeavesBuilding(sample.point, end, footprint)) continue;
-
-          const riverHit = nearestRayHit(sample.point, angle, riverSegments);
-          if (riverHit && riverHit.distance > 2 && riverHit.distance < CITY_VIEW_DISTANCE_M) continue;
-
-          const blockerProfile = rayBlockerProfile(sample.point, angle, CITY_VIEW_DISTANCE_M, footprint);
-          if (blockerProfile.internalBlocked) continue;
-
-          candidates.push({
-            angle,
-            distance: CITY_VIEW_DISTANCE_M,
-            origin: sample.point,
-            end,
-            blockerHeight: blockerProfile.maxBlockerHeight,
-            blockers: blockerProfile.blockers,
-            sample
-          });
-        }
-      }
-
-      return {
-        candidates,
-        angleProfiles: buildAngleProfiles(candidates)
-      };
-    }
-
     function collectFacadeCandidates(footprint) {
       const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
       const blockers = new Map();
@@ -1175,6 +1143,7 @@
           const exactAngle = bearingTo(sample.point, target);
           const angle = normalizeAngle(Math.round(exactAngle));
           const targetDistance = distance(sample.point, target);
+          if (!rayReachesRiver(sample.point, exactAngle, targetDistance)) continue;
           const blockerProfile = rayBlockerProfile(sample.point, exactAngle, targetDistance, footprint);
           if (blockerProfile.internalBlocked) continue;
 
@@ -1200,12 +1169,11 @@
         samples,
         candidates,
         angleProfiles: buildAngleProfiles(candidates),
-        cityAngleProfiles: collectCityCandidates(footprint, samples).angleProfiles,
         blockers: [...blockers.values()].sort((a, b) => a.distance - b.distance)
       };
     }
 
-    function summarizeFacadeCandidates(footprint, candidateData, observerHeight, profileKey = "angleProfiles") {
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
       const openByDirection = {};
       const openRaysByDirection = {};
       const allOpenRays = [];
@@ -1217,7 +1185,7 @@
       let visibleFacadeLength = 0;
       let visibleSampleCount = 0;
 
-      const angleProfiles = candidateData[profileKey] || [];
+      const angleProfiles = candidateData.angleProfiles || [];
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
@@ -1287,25 +1255,22 @@
 
       for (let floor = 1; floor <= floorCount; floor += 1) {
         const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
-        const citySummary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor), "cityAngleProfiles");
         const comparable = {
-          totalOpen: summary.totalOpen,
-          cityOpen: citySummary.totalOpen
+          totalOpen: summary.totalOpen
         };
 
         if (!previous) {
-          previous = { start: floor, end: floor, comparable, summary, citySummary };
+          previous = { start: floor, end: floor, comparable, summary };
           continue;
         }
 
-        const same = comparable.totalOpen === previous.comparable.totalOpen &&
-          comparable.cityOpen === previous.comparable.cityOpen;
+        const same = comparable.totalOpen === previous.comparable.totalOpen;
 
         if (same) {
           previous.end = floor;
         } else {
           bands.push(previous);
-          previous = { start: floor, end: floor, comparable, summary, citySummary };
+          previous = { start: floor, end: floor, comparable, summary };
         }
       }
 
@@ -1471,12 +1436,6 @@
           candidateData,
           floorEyeHeight(footprint, displayFloor)
         );
-        const cityView = summarizeFacadeCandidates(
-          footprint,
-          candidateData,
-          floorEyeHeight(footprint, displayFloor),
-          "cityAngleProfiles"
-        );
         const totalOpen = facadeView.totalOpen;
         const grade = totalOpen >= 60 ? "전면 조망" :
           totalOpen >= 30 ? "양호한 부분 조망" :
@@ -1493,9 +1452,6 @@
           allOpenSummary: facadeView.allOpenSummary,
           allOpenRays: facadeView.allOpenRays,
           totalOpen,
-          cityOpen: cityView.totalOpen,
-          cityOpenSummary: cityView.allOpenSummary,
-          cityOpenRays: cityView.allOpenRays,
           visibleFacadeLength: facadeView.visibleFacadeLength,
           visibleFacadeSegments: facadeView.visibleFacadeSegments,
           visibleSampleCount: facadeView.visibleSampleCount,
@@ -1831,10 +1787,10 @@
       return unique.length > 3 ? `${visible} 외 ${unique.length - 3}` : visible;
     }
 
-    function formatFloorBandItem(label, riverAngle, cityAngle, blockers, index) {
+    function formatFloorBandItem(label, riverAngle, blockers, index) {
       const blockerText = formatBlockerNames(blockers);
       const blockerHtml = blockerText ? ` <span style="color:#fca5a5;">차폐 ${escapeHtml(blockerText)}</span>` : "";
-      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} 한강 ${Math.round(riverAngle)}도 / 시티 ${Math.round(cityAngle)}도${blockerHtml}</span>`;
+      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(riverAngle)}도${blockerHtml}</span>`;
     }
 
     function formatFloorBands(analysis) {
@@ -1846,7 +1802,6 @@
         return formatFloorBandItem(
           "전층",
           only.summary.totalOpen,
-          only.citySummary ? only.citySummary.totalOpen : 0,
           only.summary.blockingBlockers,
           0
         );
@@ -1854,8 +1809,7 @@
       const items = bands.map((band, index) => {
         const label = formatFloorBandLabel(band, floorCount);
         const riverAngle = band.summary.totalOpen;
-        const cityAngle = band.citySummary ? band.citySummary.totalOpen : 0;
-        return formatFloorBandItem(label, riverAngle, cityAngle, band.summary.blockingBlockers, index);
+        return formatFloorBandItem(label, riverAngle, band.summary.blockingBlockers, index);
       });
       return items.join("");
     }
@@ -1868,7 +1822,6 @@
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(props.floors)],
         ["한강조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
-        ["시티뷰각", analysis ? `${analysis.cityOpen || 0}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       return `
