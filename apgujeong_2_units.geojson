@@ -156,7 +156,7 @@
         "fid": 4,
         "zone": "2구역",
         "dong": "102",
-        "unit_type": "65",
+        "unit_type": "70",
         "floors": 45,
         "piloti_m": 10,
         "floor_h": 3.692,
@@ -1787,7 +1787,7 @@
         "piloti_m": 10,
         "floor_h": 3.692,
         "height_m": 190.9,
-        "fill_color": "#FF7601",
+        "fill_color": "#F5CBCB",
         "poly_color,": null,
         "auxiliary_storage_symbol_outlinecolor_poly_color": null
       },
