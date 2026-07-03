@@ -1,0 +1,433 @@
+{
+  "river": {
+    "lineCount": 1,
+    "lengthM": 2535,
+    "scanPoints": 100
+  },
+  "totals": {
+    "2": {
+      "zone": "2구역",
+      "units": 67,
+      "floorUnits": 2746,
+      "avgAngle": 32.3,
+      "minAngle": 0,
+      "maxAngle": 153
+    },
+    "3": {
+      "zone": "3구역",
+      "units": 134,
+      "floorUnits": 5536,
+      "avgAngle": 43,
+      "minAngle": 1,
+      "maxAngle": 183
+    },
+    "4": {
+      "zone": "4구역",
+      "units": 44,
+      "floorUnits": 1696,
+      "avgAngle": 36.1,
+      "minAngle": 0,
+      "maxAngle": 131
+    },
+    "5": {
+      "zone": "5구역",
+      "units": 38,
+      "floorUnits": 1524,
+      "avgAngle": 33.4,
+      "minAngle": 0,
+      "maxAngle": 150
+    }
+  },
+  "rows": [
+    {
+      "zone": "2구역",
+      "range": "0도",
+      "count": 80,
+      "percent": 2.9
+    },
+    {
+      "zone": "2구역",
+      "range": "1-10도",
+      "count": 666,
+      "percent": 24.3
+    },
+    {
+      "zone": "2구역",
+      "range": "11-20도",
+      "count": 503,
+      "percent": 18.3
+    },
+    {
+      "zone": "2구역",
+      "range": "21-30도",
+      "count": 356,
+      "percent": 13
+    },
+    {
+      "zone": "2구역",
+      "range": "31-40도",
+      "count": 303,
+      "percent": 11
+    },
+    {
+      "zone": "2구역",
+      "range": "41-50도",
+      "count": 222,
+      "percent": 8.1
+    },
+    {
+      "zone": "2구역",
+      "range": "51-60도",
+      "count": 218,
+      "percent": 7.9
+    },
+    {
+      "zone": "2구역",
+      "range": "61-70도",
+      "count": 72,
+      "percent": 2.6
+    },
+    {
+      "zone": "2구역",
+      "range": "71-80도",
+      "count": 77,
+      "percent": 2.8
+    },
+    {
+      "zone": "2구역",
+      "range": "81-90도",
+      "count": 61,
+      "percent": 2.2
+    },
+    {
+      "zone": "2구역",
+      "range": "91-100도",
+      "count": 78,
+      "percent": 2.8
+    },
+    {
+      "zone": "2구역",
+      "range": "101-110도",
+      "count": 37,
+      "percent": 1.3
+    },
+    {
+      "zone": "2구역",
+      "range": "111-120도",
+      "count": 21,
+      "percent": 0.8
+    },
+    {
+      "zone": "2구역",
+      "range": "131-140도",
+      "count": 34,
+      "percent": 1.2
+    },
+    {
+      "zone": "2구역",
+      "range": "141-150도",
+      "count": 16,
+      "percent": 0.6
+    },
+    {
+      "zone": "2구역",
+      "range": "151-160도",
+      "count": 2,
+      "percent": 0.1
+    },
+    {
+      "zone": "3구역",
+      "range": "1-10도",
+      "count": 977,
+      "percent": 17.6
+    },
+    {
+      "zone": "3구역",
+      "range": "11-20도",
+      "count": 921,
+      "percent": 16.6
+    },
+    {
+      "zone": "3구역",
+      "range": "21-30도",
+      "count": 961,
+      "percent": 17.4
+    },
+    {
+      "zone": "3구역",
+      "range": "31-40도",
+      "count": 602,
+      "percent": 10.9
+    },
+    {
+      "zone": "3구역",
+      "range": "41-50도",
+      "count": 463,
+      "percent": 8.4
+    },
+    {
+      "zone": "3구역",
+      "range": "51-60도",
+      "count": 318,
+      "percent": 5.7
+    },
+    {
+      "zone": "3구역",
+      "range": "61-70도",
+      "count": 200,
+      "percent": 3.6
+    },
+    {
+      "zone": "3구역",
+      "range": "71-80도",
+      "count": 207,
+      "percent": 3.7
+    },
+    {
+      "zone": "3구역",
+      "range": "81-90도",
+      "count": 74,
+      "percent": 1.3
+    },
+    {
+      "zone": "3구역",
+      "range": "91-100도",
+      "count": 196,
+      "percent": 3.5
+    },
+    {
+      "zone": "3구역",
+      "range": "101-110도",
+      "count": 47,
+      "percent": 0.8
+    },
+    {
+      "zone": "3구역",
+      "range": "111-120도",
+      "count": 265,
+      "percent": 4.8
+    },
+    {
+      "zone": "3구역",
+      "range": "121-130도",
+      "count": 61,
+      "percent": 1.1
+    },
+    {
+      "zone": "3구역",
+      "range": "131-140도",
+      "count": 59,
+      "percent": 1.1
+    },
+    {
+      "zone": "3구역",
+      "range": "141-150도",
+      "count": 33,
+      "percent": 0.6
+    },
+    {
+      "zone": "3구역",
+      "range": "151-160도",
+      "count": 19,
+      "percent": 0.3
+    },
+    {
+      "zone": "3구역",
+      "range": "161-170도",
+      "count": 95,
+      "percent": 1.7
+    },
+    {
+      "zone": "3구역",
+      "range": "171-180도",
+      "count": 19,
+      "percent": 0.3
+    },
+    {
+      "zone": "3구역",
+      "range": "181-190도",
+      "count": 19,
+      "percent": 0.3
+    },
+    {
+      "zone": "4구역",
+      "range": "0도",
+      "count": 84,
+      "percent": 5
+    },
+    {
+      "zone": "4구역",
+      "range": "1-10도",
+      "count": 291,
+      "percent": 17.2
+    },
+    {
+      "zone": "4구역",
+      "range": "11-20도",
+      "count": 381,
+      "percent": 22.5
+    },
+    {
+      "zone": "4구역",
+      "range": "21-30도",
+      "count": 268,
+      "percent": 15.8
+    },
+    {
+      "zone": "4구역",
+      "range": "31-40도",
+      "count": 168,
+      "percent": 9.9
+    },
+    {
+      "zone": "4구역",
+      "range": "41-50도",
+      "count": 114,
+      "percent": 6.7
+    },
+    {
+      "zone": "4구역",
+      "range": "51-60도",
+      "count": 36,
+      "percent": 2.1
+    },
+    {
+      "zone": "4구역",
+      "range": "61-70도",
+      "count": 69,
+      "percent": 4.1
+    },
+    {
+      "zone": "4구역",
+      "range": "71-80도",
+      "count": 64,
+      "percent": 3.8
+    },
+    {
+      "zone": "4구역",
+      "range": "81-90도",
+      "count": 29,
+      "percent": 1.7
+    },
+    {
+      "zone": "4구역",
+      "range": "91-100도",
+      "count": 28,
+      "percent": 1.7
+    },
+    {
+      "zone": "4구역",
+      "range": "101-110도",
+      "count": 41,
+      "percent": 2.4
+    },
+    {
+      "zone": "4구역",
+      "range": "111-120도",
+      "count": 49,
+      "percent": 2.9
+    },
+    {
+      "zone": "4구역",
+      "range": "121-130도",
+      "count": 54,
+      "percent": 3.2
+    },
+    {
+      "zone": "4구역",
+      "range": "131-140도",
+      "count": 20,
+      "percent": 1.2
+    },
+    {
+      "zone": "5구역",
+      "range": "0도",
+      "count": 58,
+      "percent": 3.8
+    },
+    {
+      "zone": "5구역",
+      "range": "1-10도",
+      "count": 561,
+      "percent": 36.8
+    },
+    {
+      "zone": "5구역",
+      "range": "11-20도",
+      "count": 276,
+      "percent": 18.1
+    },
+    {
+      "zone": "5구역",
+      "range": "21-30도",
+      "count": 50,
+      "percent": 3.3
+    },
+    {
+      "zone": "5구역",
+      "range": "31-40도",
+      "count": 79,
+      "percent": 5.2
+    },
+    {
+      "zone": "5구역",
+      "range": "41-50도",
+      "count": 99,
+      "percent": 6.5
+    },
+    {
+      "zone": "5구역",
+      "range": "51-60도",
+      "count": 69,
+      "percent": 4.5
+    },
+    {
+      "zone": "5구역",
+      "range": "61-70도",
+      "count": 85,
+      "percent": 5.6
+    },
+    {
+      "zone": "5구역",
+      "range": "71-80도",
+      "count": 57,
+      "percent": 3.7
+    },
+    {
+      "zone": "5구역",
+      "range": "81-90도",
+      "count": 58,
+      "percent": 3.8
+    },
+    {
+      "zone": "5구역",
+      "range": "101-110도",
+      "count": 55,
+      "percent": 3.6
+    },
+    {
+      "zone": "5구역",
+      "range": "111-120도",
+      "count": 3,
+      "percent": 0.2
+    },
+    {
+      "zone": "5구역",
+      "range": "121-130도",
+      "count": 36,
+      "percent": 2.4
+    },
+    {
+      "zone": "5구역",
+      "range": "131-140도",
+      "count": 19,
+      "percent": 1.2
+    },
+    {
+      "zone": "5구역",
+      "range": "141-150도",
+      "count": 19,
+      "percent": 1.2
+    }
+  ]
+}
