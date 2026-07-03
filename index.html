@@ -402,7 +402,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v25-piloti-height / 필로티 포함 차폐계산</div>
+    <div class="hint">버전: v26-height-normalized / 구역별 높이 자동보정</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -956,7 +956,7 @@
             piloti,
             floorH: Number(props.floor_h || 3.3),
             height,
-            totalHeight: height + piloti,
+            totalHeight: totalBuildingHeight(props),
             ring,
             center: ringCentroid(ring),
             segments: ringSegments(ring)
@@ -1488,6 +1488,22 @@
       return Number(props.floors || 0);
     }
 
+    function totalBuildingHeight(props) {
+      const floors = normalizedFloorCount(props);
+      const floorH = Number(props.floor_h || 3.3);
+      const piloti = Number(props.piloti_m || 0);
+      const height = Number(props.height_m || props.height || 0);
+      const bodyHeight = floors > 0 && floorH > 0 ? floors * floorH : 0;
+      const expectedTotal = bodyHeight + piloti;
+      const tolerance = 0.25;
+
+      if (!Number.isFinite(height) || height <= 0) return expectedTotal > 0 ? expectedTotal : 20;
+      if (bodyHeight > 0 && Math.abs(height - bodyHeight) <= tolerance) return height + piloti;
+      if (expectedTotal > 0 && Math.abs(height - expectedTotal) <= tolerance) return height;
+      if (piloti > 0 && bodyHeight > 0 && height < expectedTotal - piloti * 0.45) return height + piloti;
+      return height;
+    }
+
     function riverContextForFootprint(footprint) {
       const zoneId = normalizeZoneId(footprint.zoneName);
       return riverContextsByZone.get(zoneId) || {
@@ -1999,9 +2015,7 @@
 
         const props = propsFromEntity(entity);
 
-        const height = Number(props.height_m || props.height || 0);
-        const piloti = Number(props.piloti_m || 0);
-        const totalHeight = height + (Number.isFinite(piloti) ? piloti : 0);
+        const totalHeight = totalBuildingHeight(props);
         const finalHeight = Number.isFinite(totalHeight) && totalHeight > 0 ? totalHeight : 20;
         const fill = colorFromHex(props.fill_color, Cesium.Color.RED, 1);
         const unitType = String(props.unit_type || "").trim();
