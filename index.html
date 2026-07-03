@@ -105,6 +105,9 @@
       color: #334155;
       white-space: pre-wrap;
     }
+    .status[hidden] {
+      display: none;
+    }
     .hint {
       margin-top: 6px;
       color: #64748b;
@@ -163,10 +166,10 @@
       font-weight: 800;
     }
     .selection-detail-body {
-      max-height: 168px;
-      overflow: auto;
+      max-height: none;
+      overflow: visible;
       padding: 0;
-      font-size: 10px;
+      font-size: 9.5px;
     }
     .selection-detail-empty {
       padding: 10px 8px;
@@ -175,12 +178,12 @@
     .selection-detail-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 10px;
-      line-height: 1.35;
+      font-size: 9.5px;
+      line-height: 1.25;
     }
     .selection-detail-table th,
     .selection-detail-table td {
-      padding: 5px 8px;
+      padding: 4px 7px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       vertical-align: top;
     }
@@ -301,7 +304,7 @@
         display: block;
       }
       .selection-detail-body {
-        max-height: 14svh;
+        max-height: none;
       }
       .legend button {
         padding: 2px 5px;
@@ -383,7 +386,7 @@
         display: block;
       }
       .selection-detail-body {
-        max-height: 96px;
+        max-height: none;
       }
       .cesium-infoBox {
         left: auto !important;
@@ -402,7 +405,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v26-height-normalized / 구역별 높이 자동보정</div>
+    <div class="hint">버전: v27-summary-line / 상태요약 정리 + 최신 전체 한강라인</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -420,7 +423,6 @@
       <button id="rotateAll" class="secondary">전체 자동회전</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
     </div>
-    <div class="status" id="status">데이터를 불러오는 중입니다.</div>
     <div class="legend-detail-wrap">
       <div class="legend-section">
         <label>평형 범례</label>
@@ -454,7 +456,7 @@
       },
       "3": {
         label: "3구역",
-        unitsUrl: ["apgujeong_3_units.geojson", "apg3_unit_polygon.geojson", "apg3_unit_polygon"],
+        unitsUrl: "apg3_unit_polygon.geojson",
         riverUrl: ALL_RIVER_URL
       },
       "4": {
@@ -571,7 +573,9 @@
     const viewAnalysisByFid = new Map();
 
     function setStatus(message) {
-      if (statusEl) statusEl.textContent = message;
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.hidden = /로드 완료/.test(message);
     }
 
     function setActiveMapButton(mapId) {
@@ -945,17 +949,15 @@
           }
         }
         for (const ring of rings) {
-          const height = Number(props.height_m || 0);
-          const piloti = Number(props.piloti_m || 0);
           const footprint = {
             fid: props.fid,
             zoneName: String(props.zone || props.source_zone || "").trim(),
             dong: props.dong,
             unitType: String(props.unit_type || "").trim(),
             floors: normalizedFloorCount(props),
-            piloti,
+            piloti: Number(props.piloti_m || 0),
             floorH: Number(props.floor_h || 3.3),
-            height,
+            height: Number(props.height_m || 0),
             totalHeight: totalBuildingHeight(props),
             ring,
             center: ringCentroid(ring),
@@ -1125,8 +1127,8 @@
       const piloti = Number.isFinite(footprint.piloti) ? footprint.piloti : 0;
       const floorH = Number.isFinite(footprint.floorH) && footprint.floorH > 0 ? footprint.floorH : 3.3;
       const raw = piloti + Math.max(0, floor - 0.5) * floorH;
-      const totalHeight = Number(footprint.totalHeight || 0);
-      return totalHeight > 0 ? Math.min(raw, totalHeight + 1.5) : raw;
+      const capHeight = Number(footprint.totalHeight || footprint.height || 0);
+      return capHeight > 0 ? Math.min(raw, capHeight + 1.5) : raw;
     }
 
     function viewRayLeavesBuilding(samplePoint, targetPoint, footprint) {
@@ -1497,10 +1499,18 @@
       const expectedTotal = bodyHeight + piloti;
       const tolerance = 0.25;
 
-      if (!Number.isFinite(height) || height <= 0) return expectedTotal > 0 ? expectedTotal : 20;
-      if (bodyHeight > 0 && Math.abs(height - bodyHeight) <= tolerance) return height + piloti;
-      if (expectedTotal > 0 && Math.abs(height - expectedTotal) <= tolerance) return height;
-      if (piloti > 0 && bodyHeight > 0 && height < expectedTotal - piloti * 0.45) return height + piloti;
+      if (!Number.isFinite(height) || height <= 0) {
+        return expectedTotal > 0 ? expectedTotal : 20;
+      }
+      if (bodyHeight > 0 && Math.abs(height - bodyHeight) <= tolerance) {
+        return height + piloti;
+      }
+      if (expectedTotal > 0 && Math.abs(height - expectedTotal) <= tolerance) {
+        return height;
+      }
+      if (piloti > 0 && bodyHeight > 0 && height < expectedTotal - piloti * 0.45) {
+        return height + piloti;
+      }
       return height;
     }
 
@@ -1878,7 +1888,7 @@
     }
 
     function formatFloorBandItem(label, riverAngle, index) {
-      return `<span style="display:inline-block; margin-right:16px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(riverAngle)}도</span>`;
+      return `<span style="display:inline-block; margin-right:10px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(riverAngle)}도</span>`;
     }
 
     function formatFloorBands(analysis) {
@@ -1908,7 +1918,7 @@
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(normalizedFloorCount(props))],
-        ["한강조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
+        ["최고층 조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
         ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       return `
@@ -2015,8 +2025,7 @@
 
         const props = propsFromEntity(entity);
 
-        const totalHeight = totalBuildingHeight(props);
-        const finalHeight = Number.isFinite(totalHeight) && totalHeight > 0 ? totalHeight : 20;
+        const finalHeight = totalBuildingHeight(props);
         const fill = colorFromHex(props.fill_color, Cesium.Color.RED, 1);
         const unitType = String(props.unit_type || "").trim();
         const typeLabel = unitType ? `${unitType}PY` : "";
@@ -2089,18 +2098,13 @@
     }
 
     function featureIdValue(feature, fallbackIndex) {
-      const props = { ...(feature.properties || {}) };
-      const candidates = [props.fid, props.id, props.objectid, props.OBJECTID, props.source_fid];
-      for (const value of candidates) {
-        const text = String(value ?? "").trim();
-        if (text && text.toLowerCase() !== "null" && text.toLowerCase() !== "undefined") {
-          return text;
-        }
-      }
-      return String(fallbackIndex + 1);
+      const props = feature.properties || {};
+      const fid = props.fid;
+      if (fid !== null && fid !== undefined && String(fid).trim() !== "") return fid;
+      return fallbackIndex + 1;
     }
 
-    function cloneFeatureWithZone(feature, zoneId, fallbackIndex) {
+    function cloneFeatureWithZone(feature, zoneId, fallbackIndex = 0) {
       const props = { ...(feature.properties || {}) };
       const sourceFid = featureIdValue(feature, fallbackIndex);
       props.source_fid = sourceFid;
