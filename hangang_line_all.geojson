@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "hangang_line_all",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{"type":"Feature","properties":{"fid":1,"line_id":"H_ALL_01","name":"전체한강조망라인","use_for":"2,3,4,5구역","memo":"조망기준선"},"geometry":{"type":"LineString","coordinates":[[127.018718656646456,37.528205305389477],[127.023558341976738,37.532178215638453],[127.026233311823844,37.534140068570764],[127.029171139979582,37.534728614386971],[127.042190357385607,37.53112369836316]]}}
+]
+}
