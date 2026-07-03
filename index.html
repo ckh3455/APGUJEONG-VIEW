@@ -402,7 +402,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v24-fid-zone3 / 3구역 고유ID + 전체 한강라인</div>
+    <div class="hint">버전: v25-piloti-height / 필로티 포함 차폐계산</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -945,15 +945,18 @@
           }
         }
         for (const ring of rings) {
+          const height = Number(props.height_m || 0);
+          const piloti = Number(props.piloti_m || 0);
           const footprint = {
             fid: props.fid,
             zoneName: String(props.zone || props.source_zone || "").trim(),
             dong: props.dong,
             unitType: String(props.unit_type || "").trim(),
             floors: normalizedFloorCount(props),
-            piloti: Number(props.piloti_m || 0),
+            piloti,
             floorH: Number(props.floor_h || 3.3),
-            height: Number(props.height_m || 0),
+            height,
+            totalHeight: height + piloti,
             ring,
             center: ringCentroid(ring),
             segments: ringSegments(ring)
@@ -1095,7 +1098,7 @@
             dong: footprint.dong,
             unitType: footprint.unitType,
             distance: t,
-            height: Number(footprint.height || 0),
+            height: Number(footprint.totalHeight || footprint.height || 0),
             floors: Number(footprint.floors || 0)
           });
         }
@@ -1122,7 +1125,8 @@
       const piloti = Number.isFinite(footprint.piloti) ? footprint.piloti : 0;
       const floorH = Number.isFinite(footprint.floorH) && footprint.floorH > 0 ? footprint.floorH : 3.3;
       const raw = piloti + Math.max(0, floor - 0.5) * floorH;
-      return footprint.height > 0 ? Math.min(raw, footprint.height + 1.5) : raw;
+      const totalHeight = Number(footprint.totalHeight || 0);
+      return totalHeight > 0 ? Math.min(raw, totalHeight + 1.5) : raw;
     }
 
     function viewRayLeavesBuilding(samplePoint, targetPoint, footprint) {
@@ -1996,7 +2000,9 @@
         const props = propsFromEntity(entity);
 
         const height = Number(props.height_m || props.height || 0);
-        const finalHeight = Number.isFinite(height) && height > 0 ? height : 20;
+        const piloti = Number(props.piloti_m || 0);
+        const totalHeight = height + (Number.isFinite(piloti) ? piloti : 0);
+        const finalHeight = Number.isFinite(totalHeight) && totalHeight > 0 ? totalHeight : 20;
         const fill = colorFromHex(props.fill_color, Cesium.Color.RED, 1);
         const unitType = String(props.unit_type || "").trim();
         const typeLabel = unitType ? `${unitType}PY` : "";
