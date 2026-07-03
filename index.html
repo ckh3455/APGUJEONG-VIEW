@@ -420,6 +420,7 @@
       <button id="rotateAll" class="secondary">전체 자동회전</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
     </div>
+    <div class="status" id="status">데이터를 불러오는 중입니다.</div>
     <div class="legend-detail-wrap">
       <div class="legend-section">
         <label>평형 범례</label>
@@ -2067,9 +2068,21 @@
       throw new Error(errors.join(" / "));
     }
 
-    function cloneFeatureWithZone(feature, zoneId) {
+    function featureIdValue(feature, fallbackIndex) {
       const props = { ...(feature.properties || {}) };
-      const sourceFid = props.fid ?? "";
+      const candidates = [props.fid, props.id, props.objectid, props.OBJECTID, props.source_fid];
+      for (const value of candidates) {
+        const text = String(value ?? "").trim();
+        if (text && text.toLowerCase() !== "null" && text.toLowerCase() !== "undefined") {
+          return text;
+        }
+      }
+      return String(fallbackIndex + 1);
+    }
+
+    function cloneFeatureWithZone(feature, zoneId, fallbackIndex) {
+      const props = { ...(feature.properties || {}) };
+      const sourceFid = featureIdValue(feature, fallbackIndex);
       props.source_fid = sourceFid;
       props.source_zone = zoneId;
       props.fid = `${zoneId}-${sourceFid}`;
@@ -2084,7 +2097,7 @@
       return {
         type: "FeatureCollection",
         features: collections.flatMap(({ data, zoneId }) =>
-          (data.features || []).map(feature => cloneFeatureWithZone(feature, zoneId))
+          (data.features || []).map((feature, index) => cloneFeatureWithZone(feature, zoneId, index))
         )
       };
     }
