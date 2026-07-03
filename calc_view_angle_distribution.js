@@ -134,9 +134,21 @@ function normalizedFloorCount(props) {
   if (zoneId === "2" && String(props.dong || "").trim() === "105") return 65;
   return Number(props.floors || 0);
 }
+function normalizedFloorHeight(props) {
+  const raw = Number(props.floor_h);
+  if (Number.isFinite(raw) && raw > 0 && raw < 20) return raw;
+  if (Number.isFinite(raw) && raw >= 1000 && raw < 10000) return raw / 1000;
+  const zoneId = normalizeZoneId(props.zone || props.source_zone || "");
+  if (zoneId === "2" || zoneId === "3") return 3.692;
+  const floors = normalizedFloorCount(props);
+  const piloti = Number(props.piloti_m || 0);
+  const height = Number(props.height_m || props.height || 0);
+  if (floors > 0 && height > piloti) return (height - piloti) / floors;
+  return 3.692;
+}
 function totalBuildingHeight(props) {
   const floors = normalizedFloorCount(props);
-  const floorH = Number(props.floor_h || 3.3);
+  const floorH = normalizedFloorHeight(props);
   const piloti = Number(props.piloti_m || 0);
   const height = Number(props.height_m || props.height || 0);
   const bodyHeight = floors > 0 && floorH > 0 ? floors * floorH : 0;
@@ -182,7 +194,7 @@ function prepareFootprints(features) {
         unitType: String(props.unit_type || "").trim(),
         floors: normalizedFloorCount(props),
         piloti: Number(props.piloti_m || 0),
-        floorH: Number(props.floor_h || 3.3),
+        floorH: normalizedFloorHeight(props),
         height: Number(props.height_m || 0),
         totalHeight: totalBuildingHeight(props),
         ring,
