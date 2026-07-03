@@ -406,6 +406,7 @@
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
+      <button type="button" data-zone="3">3구역</button>
       <button type="button" data-zone="4">4구역</button>
       <button type="button" data-zone="5">5구역</button>
     </div>
@@ -439,25 +440,31 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
+    const ALL_RIVER_URL = "hangang_line_all.geojson";
     const ZONE_CONFIGS = {
       "ALL": {
         label: "전체",
-        zoneIds: ["2", "4", "5"]
+        zoneIds: ["2", "3", "4", "5"]
       },
       "2": {
         label: "2구역",
         unitsUrl: "apgujeong_2_units.geojson",
-        riverUrl: "hangang_line_zone2.geojson"
+        riverUrl: ALL_RIVER_URL
+      },
+      "3": {
+        label: "3구역",
+        unitsUrl: ["apgujeong_3_units.geojson", "apg3_unit_polygon.geojson", "apg3_unit_polygon"],
+        riverUrl: ALL_RIVER_URL
       },
       "4": {
         label: "4구역",
         unitsUrl: "apgujeong_4_units.geojson",
-        riverUrl: "hangang_line_zone45.geojson"
+        riverUrl: ALL_RIVER_URL
       },
       "5": {
         label: "5구역",
         unitsUrl: "apgujeong_5_units.geojson",
-        riverUrl: "hangang_line_zone45.geojson"
+        riverUrl: ALL_RIVER_URL
       }
     };
     const MAP_CONFIGS = {
@@ -1464,6 +1471,7 @@
     function normalizeZoneId(value) {
       const text = String(value || "").trim();
       if (text.includes("2")) return "2";
+      if (text.includes("3")) return "3";
       if (text.includes("4")) return "4";
       if (text.includes("5")) return "5";
       return text;
@@ -2045,9 +2053,18 @@
     }
 
     async function fetchGeoJson(url) {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-      return response.json();
+      const urls = Array.isArray(url) ? url : [url];
+      const errors = [];
+      for (const candidate of urls) {
+        try {
+          const response = await fetch(candidate, { cache: "no-store" });
+          if (!response.ok) throw new Error(`${candidate}: HTTP ${response.status}`);
+          return response.json();
+        } catch (error) {
+          errors.push(error.message);
+        }
+      }
+      throw new Error(errors.join(" / "));
     }
 
     function cloneFeatureWithZone(feature, zoneId) {
