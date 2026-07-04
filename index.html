@@ -25,21 +25,21 @@
     .panel {
       position: absolute;
       z-index: 5;
-      top: 14px;
-      left: 14px;
-      width: 640px;
+      top: 10px;
+      left: 10px;
+      width: 500px;
       max-width: calc(100vw - 28px);
-      padding: 9px;
+      padding: 8px;
       background: rgba(255, 255, 255, 0.94);
       border: 1px solid #d9dee7;
       border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-      font-size: 11px;
-      line-height: 1.35;
+      font-size: 10px;
+      line-height: 1.28;
     }
     .panel h1 {
-      margin: 0 0 6px;
-      font-size: 14px;
+      margin: 0 0 4px;
+      font-size: 13px;
     }
     .row {
       display: grid;
@@ -63,7 +63,7 @@
       font-size: 12px;
     }
     button {
-      padding: 6px 8px;
+      padding: 5px 7px;
       border: 0;
       border-radius: 6px;
       background: #2563eb;
@@ -77,20 +77,27 @@
     .buttons {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      gap: 5px;
+      margin-top: 6px;
     }
     .zone-tabs,
     .map-tabs {
       display: flex;
-      gap: 5px;
-      margin-top: 8px;
+      gap: 4px;
+      margin-top: 6px;
     }
     .zone-tabs button,
     .map-tabs button {
       flex: 1;
       background: #e2e8f0;
       color: #1e293b;
+      min-height: 30px;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+    .buttons button {
+      min-height: 28px;
+      font-size: 11px;
     }
     .zone-tabs button.active,
     .map-tabs button.active {
@@ -109,26 +116,26 @@
       display: none;
     }
     .hint {
-      margin-top: 6px;
+      margin-top: 4px;
       color: #64748b;
       font-size: 10px;
     }
     .legend {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 6px;
+      gap: 3px;
+      margin-top: 4px;
     }
     .legend button {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px 6px;
+      gap: 3px;
+      padding: 2px 5px;
       border: 1px solid #cbd5e1;
       border-radius: 999px;
       background: #ffffff;
       color: #1f2937;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
     }
     .legend button.active {
@@ -136,17 +143,17 @@
       box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
     }
     .swatch {
-      width: 9px;
-      height: 9px;
+      width: 8px;
+      height: 8px;
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-radius: 2px;
     }
     .legend-detail-wrap {
       display: grid;
-      grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.95fr);
-      gap: 8px;
+      grid-template-columns: minmax(190px, 0.78fr) minmax(230px, 1fr);
+      gap: 6px;
       align-items: start;
-      margin-top: 8px;
+      margin-top: 6px;
     }
     .legend-section,
     .selection-detail {
@@ -160,7 +167,7 @@
       box-shadow: 0 5px 16px rgba(15, 23, 42, 0.22);
     }
     .selection-detail-title {
-      padding: 6px 8px;
+      padding: 5px 7px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.12);
       font-size: 11px;
       font-weight: 800;
@@ -169,7 +176,7 @@
       max-height: none;
       overflow: visible;
       padding: 0;
-      font-size: 9.5px;
+      font-size: 9px;
     }
     .selection-detail-empty {
       padding: 10px 8px;
@@ -178,8 +185,8 @@
     .selection-detail-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9.5px;
-      line-height: 1.25;
+      font-size: 9px;
+      line-height: 1.2;
     }
     .selection-detail-table th,
     .selection-detail-table td {
@@ -246,7 +253,7 @@
         top: 8px;
         left: 8px;
         right: auto;
-        width: calc(50vw - 12px);
+        width: calc(46vw - 10px);
         max-width: none;
         max-height: 44svh;
         overflow-y: auto;
@@ -318,7 +325,7 @@
       }
       .cesium-infoBox {
         top: 8px !important;
-        left: calc(50vw + 4px) !important;
+        left: calc(46vw + 4px) !important;
         right: 8px !important;
         bottom: auto !important;
         width: auto !important;
@@ -350,7 +357,7 @@
     }
     @media (max-width: 480px) {
       .panel {
-        width: calc(50vw - 10px);
+        width: calc(46vw - 8px);
         max-height: 45svh;
       }
       .zone-tabs button,
@@ -363,7 +370,7 @@
         max-height: 13svh;
       }
       .cesium-infoBox {
-        left: calc(50vw + 2px) !important;
+        left: calc(46vw + 2px) !important;
         max-height: 45svh !important;
       }
       .cesium-infoBox-body {
@@ -373,7 +380,7 @@
     @media (max-width: 900px) and (orientation: landscape) {
       .panel {
         right: auto;
-        width: 320px;
+        width: 280px;
         max-height: calc(100svh - 24px);
       }
       .legend {
@@ -405,7 +412,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v29-floor-occlusion / 실제 한강변 라인 + 층별 차폐 보정</div>
+    <div class="hint">버전: v30-compact-pent-blocker / 한강라인 200m 연장 + 앞동 펜트 1층 차폐 반영</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -443,8 +450,9 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v29-floor-occlusion-20260704";
+    const DATA_VERSION = "v30-compact-pent-blocker-20260704";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
+    const BLOCKER_PENTHOUSE_FLOORS = 1;
     const ALL_RIVER_URL = "hangang_line_all.geojson";
     const ZONE_CONFIGS = {
       "ALL": {
@@ -1082,6 +1090,16 @@
       return hit.distance > 2;
     }
 
+    function blockerOcclusionHeight(footprint) {
+      const baseHeight = Number(footprint.totalHeight || footprint.height || 0);
+      const floorH = Number.isFinite(footprint.floorH) && footprint.floorH > 0 ? footprint.floorH : 3.692;
+      return baseHeight + floorH * BLOCKER_PENTHOUSE_FLOORS;
+    }
+
+    function blockerOcclusionFloors(footprint) {
+      return Number(footprint.floors || 0) + BLOCKER_PENTHOUSE_FLOORS;
+    }
+
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
       let internalBlocked = false;
       const hits = [];
@@ -1102,8 +1120,8 @@
             dong: footprint.dong,
             unitType: footprint.unitType,
             distance: t,
-            height: Number(footprint.totalHeight || footprint.height || 0),
-            floors: Number(footprint.floors || 0)
+            height: blockerOcclusionHeight(footprint),
+            floors: blockerOcclusionFloors(footprint)
           });
         }
       }
