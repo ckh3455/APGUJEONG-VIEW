@@ -405,7 +405,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v28-actual-river-lower1 / 실제 한강변 라인 + 2·4구역 최고층 1층 하향</div>
+    <div class="hint">버전: v29-floor-occlusion / 실제 한강변 라인 + 층별 차폐 보정</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -443,7 +443,8 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v28-actual-river-lower1-20260704";
+    const DATA_VERSION = "v29-floor-occlusion-20260704";
+    const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const ALL_RIVER_URL = "hangang_line_all.geojson";
     const ZONE_CONFIGS = {
       "ALL": {
@@ -1164,21 +1165,29 @@
     function buildAngleProfiles(candidates) {
       const byAngle = new Map();
       for (const candidate of candidates) {
-        const current = byAngle.get(candidate.angle);
-        if (isBetterAngleProfile(candidate, current)) {
-          byAngle.set(candidate.angle, {
-            angle: candidate.angle,
-            order: candidate.angle,
-            distance: candidate.distance,
-            origin: candidate.origin,
-            end: candidate.end,
-            blockerHeight: candidate.blockerHeight,
-            blockers: candidate.blockers,
-            sample: candidate.sample
-          });
-        }
+        if (!byAngle.has(candidate.angle)) byAngle.set(candidate.angle, []);
+        byAngle.get(candidate.angle).push(candidate);
       }
-      return [...byAngle.values()].sort((a, b) => a.order - b.order);
+
+      return [...byAngle.entries()]
+        .map(([angle, angleCandidates]) => {
+          const representative = angleCandidates.reduce((best, candidate) =>
+            isBetterAngleProfile(candidate, best) ? candidate : best, null);
+          const maxBlockerHeight = angleCandidates.reduce((maxHeight, candidate) =>
+            Math.max(maxHeight, Number(candidate.blockerHeight || 0)), 0);
+          return {
+            angle,
+            order: angle,
+            distance: representative.distance,
+            origin: representative.origin,
+            end: representative.end,
+            blockerHeight: maxBlockerHeight,
+            blockers: representative.blockers,
+            sample: representative.sample,
+            candidates: angleCandidates
+          };
+        })
+        .sort((a, b) => a.order - b.order);
     }
 
     function firstBlockingBlocker(blockers, observerHeight) {
@@ -1186,6 +1195,28 @@
         .slice()
         .sort((a, b) => a.distance - b.distance)
         .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
+    }
+
+    function openCandidateForFloor(profile, observerHeight) {
+      const candidates = profile.candidates || [profile];
+      if (!candidates.length) return null;
+      const openCandidates = candidates.filter(candidate =>
+        Number(candidate.blockerHeight || 0) < observerHeight
+      );
+      if ((openCandidates.length / candidates.length) < ANGLE_OPEN_RATIO_THRESHOLD) return null;
+      return openCandidates.reduce((best, candidate) =>
+        isBetterAngleProfile(candidate, best) ? candidate : best, null);
+    }
+
+    function blockingBlockerForFloor(profile, observerHeight) {
+      const candidates = profile.candidates || [profile];
+      const blockers = [];
+      for (const candidate of candidates) {
+        if (Number(candidate.blockerHeight || 0) >= observerHeight) {
+          blockers.push(...(candidate.blockers || []));
+        }
+      }
+      return firstBlockingBlocker(blockers, observerHeight);
     }
 
     function collectFacadeCandidates(footprint) {
@@ -1245,8 +1276,9 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        if (profile.blockerHeight >= observerHeight) {
-          const activeBlocker = firstBlockingBlocker(profile.blockers, observerHeight);
+        const openCandidate = openCandidateForFloor(profile, observerHeight);
+        if (!openCandidate) {
+          const activeBlocker = blockingBlockerForFloor(profile, observerHeight);
           if (activeBlocker) {
             blockingFloorSet.add(Math.round(activeBlocker.floors));
             const key = `${activeBlocker.zoneName || ""}:${activeBlocker.dong || ""}`;
@@ -1258,19 +1290,19 @@
         const ray = {
           angle: profile.angle,
           order: profile.angle,
-          distance: profile.distance,
-          origin: profile.origin,
-          end: profile.end
+          distance: openCandidate.distance,
+          origin: openCandidate.origin,
+          end: openCandidate.end
         };
         addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays);
 
-        if (!visibleSamples.has(profile.sample)) {
-          visibleSamples.add(profile.sample);
+        if (!visibleSamples.has(openCandidate.sample)) {
+          visibleSamples.add(openCandidate.sample);
           visibleSampleCount += 1;
-          visibleFacadeLength += profile.sample.length;
+          visibleFacadeLength += openCandidate.sample.length;
           visibleFacadeSegments.push({
-            a: profile.sample.a,
-            b: profile.sample.b
+            a: openCandidate.sample.a,
+            b: openCandidate.sample.b
           });
         }
       }
