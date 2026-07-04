@@ -418,7 +418,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v32-osm-qgis-clip / OSM 주변건물 + QGIS 구역경계 clipping 테스트</div>
+    <div class="hint">버전: v34-qgis-boundary-clip / QGIS 누끼 경계 clipping + OSM 기준고 보정</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -458,13 +458,14 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v32-osm-qgis-clip-20260704";
+    const DATA_VERSION = "v34-qgis-boundary-clip-20260704";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const OSM_CLIP_URLS = [
       "apgujeong_zone_boundaries.geojson",
       "apgujeong_osm_clipping_zones.geojson"
     ];
+    const OSM_BUILDING_VERTICAL_OFFSET_M = -32;
     const ALL_RIVER_URL = "hangang_line_all.geojson";
     const ZONE_CONFIGS = {
       "ALL": {
@@ -2252,6 +2253,32 @@
       });
     }
 
+    function applyOsmTilesetAppearance(tileset) {
+      tileset.style = new Cesium.Cesium3DTileStyle({
+        color: "color('white', 1.0)"
+      });
+      tileset.showOutline = false;
+      if (Cesium.Cesium3DTileColorBlendMode) {
+        tileset.colorBlendMode = Cesium.Cesium3DTileColorBlendMode.REPLACE;
+      }
+      if (Cesium.ShadowMode) {
+        tileset.shadows = Cesium.ShadowMode.DISABLED;
+      }
+    }
+
+    function applyOsmTilesetHeightOffset(tileset) {
+      if (!tileset.boundingSphere || !tileset.boundingSphere.center) return;
+      const cartographic = Cesium.Cartographic.fromCartesian(tileset.boundingSphere.center);
+      const surface = Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, 0);
+      const shifted = Cesium.Cartesian3.fromRadians(
+        cartographic.longitude,
+        cartographic.latitude,
+        OSM_BUILDING_VERTICAL_OFFSET_M
+      );
+      const translation = Cesium.Cartesian3.subtract(shifted, surface, new Cesium.Cartesian3());
+      tileset.modelMatrix = Cesium.Matrix4.fromTranslation(translation);
+    }
+
     async function ensureOsmBuildings() {
       if (osmBuildingsTileset) return osmBuildingsTileset;
       if (osmBuildingsLoading) return null;
@@ -2266,10 +2293,12 @@
         const clippingPolygons = await buildOsmClippingPolygons();
         const tileset = await Cesium.createOsmBuildingsAsync({
           style: new Cesium.Cesium3DTileStyle({
-            color: "color('#ffffff', 1.0)"
+            color: "color('white', 1.0)"
           }),
           showOutline: false
         });
+        applyOsmTilesetAppearance(tileset);
+        applyOsmTilesetHeightOffset(tileset);
         if (clippingPolygons) {
           tileset.clippingPolygons = clippingPolygons;
         }
