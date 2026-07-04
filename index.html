@@ -405,7 +405,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v27-summary-line / 상태요약 정리 + 최신 전체 한강라인</div>
+    <div class="hint">버전: v28-actual-river-lower1 / 실제 한강변 라인 + 2·4구역 최고층 1층 하향</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -443,6 +443,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
+    const DATA_VERSION = "v28-actual-river-lower1-20260704";
     const ALL_RIVER_URL = "hangang_line_all.geojson";
     const ZONE_CONFIGS = {
       "ALL": {
@@ -1485,8 +1486,6 @@
     }
 
     function normalizedFloorCount(props) {
-      const zoneId = normalizeZoneId(props.zone || props.source_zone || "");
-      if (zoneId === "2" && String(props.dong || "").trim() === "105") return 65;
       return Number(props.floors || 0);
     }
 
@@ -2100,7 +2099,8 @@
       const errors = [];
       for (const candidate of urls) {
         try {
-          const response = await fetch(candidate, { cache: "no-store" });
+          const cacheBustedUrl = `${candidate}${String(candidate).includes("?") ? "&" : "?"}v=${encodeURIComponent(DATA_VERSION)}`;
+          const response = await fetch(cacheBustedUrl, { cache: "no-store" });
           if (!response.ok) throw new Error(`${candidate}: HTTP ${response.status}`);
           return response.json();
         } catch (error) {
