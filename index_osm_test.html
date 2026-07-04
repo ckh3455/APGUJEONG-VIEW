@@ -418,7 +418,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v35-osm-local-ground-offset / QGIS 경계 clipping + OSM 로컬 기준고 보정</div>
+    <div class="hint">버전: v36-osm-white-pick-height / OSM 흰색 셰이더 + 클릭 고도 표시</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -458,7 +458,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v35-osm-local-ground-offset-20260704";
+    const DATA_VERSION = "v36-osm-white-pick-height-20260704";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const OSM_CLIP_URLS = [
@@ -596,6 +596,7 @@
     let osmBuildingsTileset = null;
     let osmBuildingsLoading = false;
     let osmBuildingsVisible = false;
+    let lastPickedHeightScreenPosition = null;
     const viewAnalysisByFid = new Map();
 
     function setStatus(message) {
@@ -2030,6 +2031,40 @@
       selectionDetailBodyEl.innerHTML = buildDescription(props);
     }
 
+    function formatDegrees(value) {
+      return `${value.toFixed(7)}°`;
+    }
+
+    function pickSceneCartesian(screenPosition) {
+      if (!screenPosition) return null;
+      if (viewer.scene.pickPositionSupported) {
+        const picked = viewer.scene.pickPosition(screenPosition);
+        if (Cesium.defined(picked)) return picked;
+      }
+      return viewer.camera.pickEllipsoid(screenPosition, viewer.scene.globe.ellipsoid);
+    }
+
+    function updatePickedHeightDetails(screenPosition) {
+      if (!selectionDetailTitleEl || !selectionDetailBodyEl) return;
+      const cartesian = pickSceneCartesian(screenPosition);
+      if (!cartesian) return;
+      const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+      const lon = Cesium.Math.toDegrees(cartographic.longitude);
+      const lat = Cesium.Math.toDegrees(cartographic.latitude);
+      const height = cartographic.height;
+      selectionDetailTitleEl.textContent = "클릭 지점 고도";
+      selectionDetailBodyEl.innerHTML = `
+        <table class="selection-detail-table">
+          <tbody>
+            <tr><th>경도</th><td>${formatDegrees(lon)}</td></tr>
+            <tr><th>위도</th><td>${formatDegrees(lat)}</td></tr>
+            <tr><th>장면 기준 고도</th><td>${height.toFixed(1)} m</td></tr>
+            <tr><th>기준</th><td>현재 Cesium 장면 표면</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
     function refreshLoadedDescriptions() {
       if (!unitsDataSource) return;
       for (const entity of unitsDataSource.entities.values) {
@@ -2263,6 +2298,21 @@
       }
       if (Cesium.ShadowMode) {
         tileset.shadows = Cesium.ShadowMode.DISABLED;
+      }
+      if (Cesium.CustomShader && Cesium.LightingModel) {
+        const shaderOptions = {
+          lightingModel: Cesium.LightingModel.UNLIT,
+          fragmentShaderText: `
+            void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
+              material.diffuse = vec3(1.0, 1.0, 1.0);
+              material.alpha = 1.0;
+            }
+          `
+        };
+        if (Cesium.CustomShaderTranslucencyMode) {
+          shaderOptions.translucencyMode = Cesium.CustomShaderTranslucencyMode.OPAQUE;
+        }
+        tileset.customShader = new Cesium.CustomShader(shaderOptions);
       }
     }
 
@@ -2525,10 +2575,26 @@
       toggleOsmBuildingsButton.addEventListener("click", toggleOsmBuildings);
     }
 
+    const pickHeightHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    pickHeightHandler.setInputAction((movement) => {
+      const picked = viewer.scene.pick(movement.position);
+      const pickedEntity = picked && picked.id;
+      if (pickedEntity && pickedEntity.polygon && pickedEntity.fidValue) {
+        lastPickedHeightScreenPosition = null;
+        return;
+      }
+      lastPickedHeightScreenPosition = Cesium.Cartesian2.clone(movement.position);
+      updatePickedHeightDetails(movement.position);
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
     viewer.selectedEntityChanged.addEventListener((entity) => {
       drawSelectedSightLines(entity);
       showLegendForSelectedEntity(entity);
-      updateSelectionDetails(entity);
+      if (!entity && lastPickedHeightScreenPosition) {
+        setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
+      } else {
+        updateSelectionDetails(entity);
+      }
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
