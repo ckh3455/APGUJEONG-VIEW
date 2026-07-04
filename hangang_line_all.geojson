@@ -19,7 +19,10 @@
         "smoothing": "centripetal_catmull_rom",
         "smoothing_note": "Actual riverfront control points are preserved and densified into a smooth LineString approximation.",
         "original_point_count": 5,
-        "smoothed_point_count": 73
+        "smoothed_point_count": 73,
+        "extension_note": "Extended approximately 70 meters at the zone-5/eastern end along the final line tangent.",
+        "extension_m": 70,
+        "extended_point_count": 74
       },
       "geometry": {
         "type": "LineString",
@@ -315,6 +318,10 @@
           [
             127.0421903573856,
             37.53112369836316
+          ],
+          [
+            127.04293719558764,
+            37.53091092448938
           ]
         ]
       }
