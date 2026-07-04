@@ -15,13 +15,16 @@
         "zone": "2구역",
         "dong": "101",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -86,13 +89,16 @@
         "zone": "2구역",
         "dong": "101",
         "unit_type": "55,56",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#B5BAFF",
         "poly_color,": "B5BAFF",
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -157,13 +163,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "70",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#F45B26",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -220,13 +229,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "55,56",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#B5BAFF",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -283,13 +295,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "45,46",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -346,13 +361,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "45,46",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -409,13 +427,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "51,52",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -472,13 +493,16 @@
         "zone": "2구역",
         "dong": "102",
         "unit_type": "60",
-        "floors": 45,
+        "floors": 44,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 176.14,
+        "height_m": 162.448,
         "fill_color": "#8100D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 45,
+        "height_m_original": 176.14,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -543,13 +567,16 @@
         "zone": "2구역",
         "dong": "103",
         "unit_type": "51,52",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -598,13 +625,16 @@
         "zone": "2구역",
         "dong": "103",
         "unit_type": "55,56",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#B5BAFF",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -661,13 +691,16 @@
         "zone": "2구역",
         "dong": "103",
         "unit_type": "45,46",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -728,13 +761,16 @@
         "zone": "2구역",
         "dong": "103",
         "unit_type": "45,46",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -799,13 +835,16 @@
         "zone": "2구역",
         "dong": "103",
         "unit_type": "25",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -854,13 +893,16 @@
         "zone": "2구역",
         "dong": "104",
         "unit_type": "60",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#8100D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -917,13 +959,16 @@
         "zone": "2구역",
         "dong": "104",
         "unit_type": "51,52",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -988,13 +1033,16 @@
         "zone": "2구역",
         "dong": "104",
         "unit_type": "41",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1043,13 +1091,16 @@
         "zone": "2구역",
         "dong": "104",
         "unit_type": "32",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1098,13 +1149,16 @@
         "zone": "2구역",
         "dong": "104",
         "unit_type": "45,46",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1169,13 +1223,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "79",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#F564A9",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1232,13 +1289,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "87",
-        "floors": 63,
+        "floors": 62,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 242.6,
+        "height_m": 228.904,
         "fill_color": "#129990",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 63,
+        "height_m_original": 242.6,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1295,13 +1355,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "32",
-        "floors": 63,
+        "floors": 62,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 242.6,
+        "height_m": 228.904,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 63,
+        "height_m_original": 242.6,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1350,13 +1413,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "51,52",
-        "floors": 63,
+        "floors": 62,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 242.6,
+        "height_m": 228.904,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 63,
+        "height_m_original": 242.6,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1405,13 +1471,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "45,46",
-        "floors": 63,
+        "floors": 62,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 242.6,
+        "height_m": 228.904,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 63,
+        "height_m_original": 242.6,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1468,13 +1537,16 @@
         "zone": "2구역",
         "dong": "105",
         "unit_type": "60",
-        "floors": 63,
+        "floors": 62,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 242.6,
+        "height_m": 228.904,
         "fill_color": "#8100D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 63,
+        "height_m_original": 242.6,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1539,13 +1611,16 @@
         "zone": "2구역",
         "dong": "106",
         "unit_type": "60",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#8100D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1602,13 +1677,16 @@
         "zone": "2구역",
         "dong": "106",
         "unit_type": "51,52",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1657,13 +1735,16 @@
         "zone": "2구역",
         "dong": "106",
         "unit_type": "32",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1720,13 +1801,16 @@
         "zone": "2구역",
         "dong": "106",
         "unit_type": "55,56",
-        "floors": 35,
+        "floors": 34,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 139.22,
+        "height_m": 125.528,
         "fill_color": "#B5BAFF",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 35,
+        "height_m_original": 139.22,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1783,13 +1867,16 @@
         "zone": "2구역",
         "dong": "106",
         "unit_type": "65",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#F5CBCB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1854,13 +1941,16 @@
         "zone": "2구역",
         "dong": "107",
         "unit_type": "45,46",
-        "floors": 29,
+        "floors": 28,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 117.07,
+        "height_m": 103.376,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 29,
+        "height_m_original": 117.07,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1917,13 +2007,16 @@
         "zone": "2구역",
         "dong": "107",
         "unit_type": "41",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -1988,13 +2081,16 @@
         "zone": "2구역",
         "dong": "107",
         "unit_type": "41",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2059,13 +2155,16 @@
         "zone": "2구역",
         "dong": "107",
         "unit_type": "25",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2114,13 +2213,16 @@
         "zone": "2구역",
         "dong": "107",
         "unit_type": "25",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2169,13 +2271,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "65",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#F5CBCB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2240,13 +2345,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "45,46",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2311,13 +2419,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "41",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2366,13 +2477,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "37",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#AEE2FF",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2421,13 +2535,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "79",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#F564A9",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2484,13 +2601,16 @@
         "zone": "2구역",
         "dong": "108",
         "unit_type": "87",
-        "floors": 65,
+        "floors": 64,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 249.98,
+        "height_m": 236.288,
         "fill_color": "#129990",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 65,
+        "height_m_original": 249.98,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2547,13 +2667,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "51,52",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.9,
+        "height_m": 177.216,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.9,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2610,13 +2733,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "25",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.91,
+        "height_m": 177.216,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.91,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2665,13 +2791,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "45,46",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.91,
+        "height_m": 177.216,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.91,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2728,13 +2857,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "55,56",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.91,
+        "height_m": 177.216,
         "fill_color": "#B5BAFF",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.91,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2791,13 +2923,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "41",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.91,
+        "height_m": 177.216,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.91,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2854,13 +2989,16 @@
         "zone": "2구역",
         "dong": "109",
         "unit_type": "60",
-        "floors": 49,
+        "floors": 48,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 190.91,
+        "height_m": 177.216,
         "fill_color": "#8100D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 49,
+        "height_m_original": 190.91,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2917,13 +3055,16 @@
         "zone": "2구역",
         "dong": "110",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -2988,13 +3129,16 @@
         "zone": "2구역",
         "dong": "110",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3059,13 +3203,16 @@
         "zone": "2구역",
         "dong": "111",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3114,13 +3261,16 @@
         "zone": "2구역",
         "dong": "111",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3169,13 +3319,16 @@
         "zone": "2구역",
         "dong": "111",
         "unit_type": "51,52",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3236,13 +3389,16 @@
         "zone": "2구역",
         "dong": "111",
         "unit_type": "45,46",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#FFEABB",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3323,13 +3479,16 @@
         "zone": "2구역",
         "dong": "112",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3378,13 +3537,16 @@
         "zone": "2구역",
         "dong": "112",
         "unit_type": "41",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3465,13 +3627,16 @@
         "zone": "2구역",
         "dong": "112",
         "unit_type": "51,52",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3520,13 +3685,16 @@
         "zone": "2구역",
         "dong": "112",
         "unit_type": "25",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3575,13 +3743,16 @@
         "zone": "2구역",
         "dong": "112",
         "unit_type": "25",
-        "floors": 20,
+        "floors": 19,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 83.84,
+        "height_m": 70.148,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 20,
+        "height_m_original": 83.84,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3630,13 +3801,16 @@
         "zone": "2구역",
         "dong": "113",
         "unit_type": "25",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 153.99,
+        "height_m": 140.296,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 153.99,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3689,13 +3863,16 @@
         "zone": "2구역",
         "dong": "113",
         "unit_type": "25",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 153.99,
+        "height_m": 140.296,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 153.99,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3744,13 +3921,16 @@
         "zone": "2구역",
         "dong": "113",
         "unit_type": "32",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3799,13 +3979,16 @@
         "zone": "2구역",
         "dong": "113",
         "unit_type": "51,52",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#FFDE42",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3854,13 +4037,16 @@
         "zone": "2구역",
         "dong": "113",
         "unit_type": "41",
-        "floors": 39,
+        "floors": 38,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 154,
+        "height_m": 140.296,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 39,
+        "height_m_original": 154,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3909,13 +4095,16 @@
         "zone": "2구역",
         "dong": "114",
         "unit_type": "32",
-        "floors": 34,
+        "floors": 33,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 135.53,
+        "height_m": 121.836,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 34,
+        "height_m_original": 135.53,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -3964,13 +4153,16 @@
         "zone": "2구역",
         "dong": "114",
         "unit_type": "41",
-        "floors": 34,
+        "floors": 33,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 135.53,
+        "height_m": 121.836,
         "fill_color": "#39B1D1",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 34,
+        "height_m_original": 135.53,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -4019,13 +4211,16 @@
         "zone": "2구역",
         "dong": "114",
         "unit_type": "32",
-        "floors": 25,
+        "floors": 24,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 102.3,
+        "height_m": 88.608,
         "fill_color": "#BB8ED0",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 25,
+        "height_m_original": 102.3,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -4070,13 +4265,16 @@
         "zone": "2구역",
         "dong": "114",
         "unit_type": "25",
-        "floors": 34,
+        "floors": 33,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 135.53,
+        "height_m": 121.836,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 34,
+        "height_m_original": 135.53,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
@@ -4125,13 +4323,16 @@
         "zone": "2구역",
         "dong": "114",
         "unit_type": "25",
-        "floors": 34,
+        "floors": 33,
         "piloti_m": 10,
         "floor_h": 3.692,
-        "height_m": 135.53,
+        "height_m": 121.836,
         "fill_color": "#91D06C",
         "poly_color,": null,
-        "auxiliary_storage_symbol_outlinecolor_poly_color": null
+        "auxiliary_storage_symbol_outlinecolor_poly_color": null,
+        "floors_original": 34,
+        "height_m_original": 135.53,
+        "lowered_note": "floors and height_m lowered by one floor to exclude possible top penthouse floor"
       },
       "geometry": {
         "type": "Polygon",
