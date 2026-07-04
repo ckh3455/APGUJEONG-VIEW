@@ -1,0 +1,2488 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <!-- Google tag (gtag.js) - 관리자 방문 통계용 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7G97GY46BX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-7G97GY46BX');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>압구정 조망 시뮬레이션</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.121/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, "Malgun Gothic", sans-serif;
+    }
+    .panel {
+      position: absolute;
+      z-index: 5;
+      top: 10px;
+      left: 10px;
+      width: 500px;
+      max-width: calc(100vw - 28px);
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid #d9dee7;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      font-size: 10px;
+      line-height: 1.28;
+    }
+    .panel h1 {
+      margin: 0 0 4px;
+      font-size: 13px;
+    }
+    .row {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    label {
+      font-weight: 700;
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      border: 1px solid #c9d0dc;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    input[type="file"] {
+      width: 100%;
+      font-size: 12px;
+    }
+    button {
+      padding: 5px 7px;
+      border: 0;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #475569;
+    }
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .zone-tabs,
+    .map-tabs {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .zone-tabs button,
+    .map-tabs button {
+      flex: 1;
+      background: #e2e8f0;
+      color: #1e293b;
+      min-height: 30px;
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+    .buttons button {
+      min-height: 28px;
+      font-size: 11px;
+    }
+    .osm-note {
+      margin-top: 5px;
+      color: #64748b;
+      font-size: 9px;
+      line-height: 1.25;
+    }
+    .zone-tabs button.active,
+    .map-tabs button.active {
+      background: #2563eb;
+      color: #ffffff;
+    }
+    .status {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+    .status[hidden] {
+      display: none;
+    }
+    .hint {
+      margin-top: 4px;
+      color: #64748b;
+      font-size: 10px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px;
+      margin-top: 4px;
+    }
+    .legend button {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 5px;
+      border: 1px solid #cbd5e1;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #1f2937;
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .legend button.active {
+      border-color: #111827;
+      box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.15);
+    }
+    .swatch {
+      width: 8px;
+      height: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      border-radius: 2px;
+    }
+    .legend-detail-wrap {
+      display: grid;
+      grid-template-columns: minmax(190px, 0.78fr) minmax(230px, 1fr);
+      gap: 6px;
+      align-items: start;
+      margin-top: 6px;
+    }
+    .legend-section,
+    .selection-detail {
+      min-width: 0;
+    }
+    .selection-detail {
+      overflow: hidden;
+      border-radius: 6px;
+      background: rgba(17, 24, 39, 0.86);
+      color: #f8fafc;
+      box-shadow: 0 5px 16px rgba(15, 23, 42, 0.22);
+    }
+    .selection-detail-title {
+      padding: 5px 7px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .selection-detail-body {
+      max-height: none;
+      overflow: visible;
+      padding: 0;
+      font-size: 9px;
+    }
+    .selection-detail-empty {
+      padding: 10px 8px;
+      color: #cbd5e1;
+    }
+    .selection-detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9px;
+      line-height: 1.2;
+    }
+    .selection-detail-table th,
+    .selection-detail-table td {
+      padding: 4px 7px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      vertical-align: top;
+    }
+    .selection-detail-table th {
+      width: 74px;
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.06);
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .selection-detail-table td {
+      color: #ffffff;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
+    }
+    .cesium-infoBox {
+      width: 300px;
+      max-width: 42vw;
+      font-size: 70%;
+    }
+    .cesium-infoBox-title {
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .cesium-infoBox-defaultTable th {
+      width: 58px;
+      min-width: 58px;
+      white-space: nowrap;
+      word-break: keep-all;
+    }
+    .cesium-infoBox-defaultTable td {
+      word-break: keep-all;
+      line-height: 1.5;
+    }
+    .floor-change {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: center;
+    }
+    .floor-band {
+      display: inline-block;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .floor-band-0 {
+      color: #60a5fa;
+    }
+    .floor-band-1 {
+      color: #34d399;
+    }
+    .floor-band-2 {
+      color: #fbbf24;
+    }
+    .floor-band-3 {
+      color: #fb7185;
+    }
+    @media (max-width: 768px) {
+      .panel {
+        top: 8px;
+        left: 8px;
+        right: auto;
+        width: calc(46vw - 10px);
+        max-width: none;
+        max-height: 44svh;
+        overflow-y: auto;
+        padding: 6px;
+        font-size: 9px;
+      }
+      .panel h1 {
+        margin-bottom: 3px;
+        font-size: 11px;
+      }
+      .hint {
+        display: none;
+      }
+      .zone-tabs,
+      .map-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .map-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .zone-tabs button,
+      .map-tabs button,
+      .buttons button {
+        min-height: 27px;
+        padding: 4px 3px;
+        border-radius: 5px;
+        font-size: 10px;
+        line-height: 1.15;
+      }
+      .buttons {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .row {
+        gap: 3px;
+        margin-top: 5px;
+      }
+      .legend {
+        max-height: 14svh;
+        overflow-y: auto;
+        padding-right: 2px;
+        gap: 3px;
+      }
+      .legend-detail-wrap {
+        grid-template-columns: 1fr;
+        gap: 5px;
+        margin-top: 5px;
+      }
+      .selection-detail {
+        display: block;
+      }
+      .selection-detail-body {
+        max-height: none;
+      }
+      .legend button {
+        padding: 2px 5px;
+        font-size: 8.5px;
+        gap: 3px;
+        line-height: 1.15;
+      }
+      .swatch {
+        width: 7px;
+        height: 7px;
+      }
+      .cesium-infoBox {
+        top: 8px !important;
+        left: calc(46vw + 4px) !important;
+        right: 8px !important;
+        bottom: auto !important;
+        width: auto !important;
+        max-width: none !important;
+        max-height: 44svh !important;
+        font-size: 50% !important;
+      }
+      .cesium-infoBox-title {
+        min-height: 26px;
+        padding: 6px 28px 5px 8px;
+        font-size: 10px !important;
+        line-height: 1.25;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(44svh - 34px) !important;
+        overflow: auto !important;
+      }
+      .cesium-infoBox-defaultTable th {
+        width: 34px;
+        min-width: 34px;
+      }
+      .cesium-infoBox-defaultTable td {
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .floor-change {
+        gap: 2px 6px;
+      }
+    }
+    @media (max-width: 480px) {
+      .panel {
+        width: calc(46vw - 8px);
+        max-height: 45svh;
+      }
+      .zone-tabs button,
+      .map-tabs button,
+      .buttons button {
+        min-height: 25px;
+        font-size: 9px;
+      }
+      .legend {
+        max-height: 13svh;
+      }
+      .cesium-infoBox {
+        left: calc(46vw + 2px) !important;
+        max-height: 45svh !important;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(45svh - 34px) !important;
+      }
+    }
+    @media (max-width: 900px) and (orientation: landscape) {
+      .panel {
+        right: auto;
+        width: 280px;
+        max-height: calc(100svh - 24px);
+      }
+      .legend {
+        max-height: 96px;
+      }
+      .legend-detail-wrap {
+        grid-template-columns: 1fr;
+      }
+      .selection-detail {
+        display: block;
+      }
+      .selection-detail-body {
+        max-height: none;
+      }
+      .cesium-infoBox {
+        left: auto !important;
+        width: 330px !important;
+        max-height: calc(100svh - 86px) !important;
+        bottom: 14px !important;
+      }
+      .cesium-infoBox-body {
+        max-height: calc(100svh - 134px) !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <div class="panel">
+    <h1>압구정 조망 시뮬레이션</h1>
+    <div class="hint">버전: v31-osm-test / OSM 주변건물 + 압구정 구역 내부 clipping 테스트</div>
+    <div class="zone-tabs" aria-label="구역 선택">
+      <button type="button" class="active" data-zone="ALL">전체</button>
+      <button type="button" data-zone="2">2구역</button>
+      <button type="button" data-zone="3">3구역</button>
+      <button type="button" data-zone="4">4구역</button>
+      <button type="button" data-zone="5">5구역</button>
+    </div>
+    <div class="map-tabs" aria-label="배경지도 선택">
+      <button type="button" class="active" data-map="street">도로지도</button>
+      <button type="button" data-map="light">밝은지도</button>
+      <button type="button" data-map="satellite">위성지도</button>
+    </div>
+    <div class="buttons">
+      <button id="rotateSelected" class="secondary">선택 위치 자동회전</button>
+      <button id="rotateAll" class="secondary">전체 자동회전</button>
+      <button id="stopRotate" class="secondary">회전 정지</button>
+      <button id="toggleOsmBuildings" class="secondary">주변건물 켜기</button>
+    </div>
+    <div class="osm-note">OSM 주변건물은 Cesium ion 토큰 입력 후 표시됩니다. 토큰은 이 브라우저에만 저장됩니다.</div>
+    <div class="legend-detail-wrap">
+      <div class="legend-section">
+        <label>평형 범례</label>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="selection-detail" aria-live="polite">
+        <div class="selection-detail-title" id="selectionDetailTitle">선택 상세</div>
+        <div class="selection-detail-body" id="selectionDetailBody">
+          <div class="selection-detail-empty">유닛을 클릭하면 상세설명이 표시됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    Cesium.Ion.defaultAccessToken = "";
+
+    const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
+    const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
+    const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
+    const DATA_VERSION = "v31-osm-test-20260704";
+    const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
+    const BLOCKER_PENTHOUSE_FLOORS = 1;
+    const OSM_CLIP_URL = "apgujeong_osm_clipping_zones.geojson";
+    const ALL_RIVER_URL = "hangang_line_all.geojson";
+    const ZONE_CONFIGS = {
+      "ALL": {
+        label: "전체",
+        zoneIds: ["2", "3", "4", "5"]
+      },
+      "2": {
+        label: "2구역",
+        unitsUrl: "apgujeong_2_units.geojson",
+        riverUrl: ALL_RIVER_URL
+      },
+      "3": {
+        label: "3구역",
+        unitsUrl: "apg3_unit_polygon.geojson",
+        riverUrl: ALL_RIVER_URL
+      },
+      "4": {
+        label: "4구역",
+        unitsUrl: "apgujeong_4_units.geojson",
+        riverUrl: ALL_RIVER_URL
+      },
+      "5": {
+        label: "5구역",
+        unitsUrl: "apgujeong_5_units.geojson",
+        riverUrl: ALL_RIVER_URL
+      }
+    };
+    const MAP_CONFIGS = {
+      street: {
+        label: "도로지도",
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        credit: "OpenStreetMap"
+      },
+      light: {
+        label: "밝은지도",
+        url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        credit: "CARTO, OpenStreetMap"
+      },
+      satellite: {
+        label: "위성지도",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        credit: "Esri World Imagery"
+      }
+    };
+    const statusEl = document.getElementById("status");
+    const legendEl = document.getElementById("legend");
+    const selectionDetailTitleEl = document.getElementById("selectionDetailTitle");
+    const selectionDetailBodyEl = document.getElementById("selectionDetailBody");
+    const riverExtendInput = document.getElementById("riverExtendMeters");
+    const PUBLIC_VWORLD_KEY = "";
+    const VWORLD_KEY_STORAGE = "apgujeong_vworld_key";
+
+    const viewer = new Cesium.Viewer("cesiumContainer", {
+      animation: false,
+      timeline: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: true,
+      baseLayerPicker: false,
+      navigationHelpButton: false,
+      infoBox: false,
+      selectionIndicator: true,
+      sceneMode: Cesium.SceneMode.SCENE3D,
+      baseLayer: false,
+      terrainProvider: new Cesium.EllipsoidTerrainProvider()
+    });
+
+    viewer.scene.globe.depthTestAgainstTerrain = false;
+    function enable3DControls() {
+      const controller = viewer.scene.screenSpaceCameraController;
+      controller.enableInputs = true;
+      controller.enableRotate = true;
+      controller.enableTilt = true;
+      controller.enableTranslate = true;
+      controller.enableZoom = true;
+      controller.enableLook = true;
+      controller.minimumZoomDistance = 20;
+      controller.maximumZoomDistance = 6000;
+      controller.inertiaZoom = 0.18;
+      controller.maximumMovementRatio = 0.055;
+      if ("_zoomFactor" in controller) {
+        controller._zoomFactor = 1.8;
+      }
+      if (viewer.scene.mode !== Cesium.SceneMode.SCENE3D) {
+        viewer.scene.morphTo3D(0);
+      }
+    }
+
+    function reset3DView() {
+      enable3DControls();
+      viewer.scene.camera.setView({
+        destination: APGUJEONG_CENTER,
+        orientation: {
+          heading: Cesium.Math.toRadians(335),
+          pitch: Cesium.Math.toRadians(-48),
+          roll: 0
+        }
+      });
+    }
+
+    reset3DView();
+
+    let unitsDataSource = null;
+    let vworldLayer = null;
+    let publicBaseLayer = null;
+    const overlayEntities = [];
+    const selectedSightEntities = [];
+    const riverLineEntities = [];
+    let currentFilter = "ALL";
+    let footprints = [];
+    let riverSegments = [];
+    let riverPoints = [];
+    let activeRiverSegments = riverSegments;
+    let activeRiverPoints = riverPoints;
+    const riverRawGeoJsonByZone = new Map();
+    const riverContextsByZone = new Map();
+    let riverLinesForDisplay = [];
+    let riverRawGeoJson = null;
+    let lastRiverStats = null;
+    let currentZoneId = "ALL";
+    let loadedLegendItems = [];
+    let autoRotateActive = false;
+    let autoRotateCenter = null;
+    let autoRotateHeadingDeg = 335;
+    let autoRotatePitch = Cesium.Math.toRadians(-38);
+    let autoRotateRange = 900;
+    let autoRotateLastMs = 0;
+    let osmBuildingsTileset = null;
+    let osmBuildingsLoading = false;
+    let osmBuildingsVisible = false;
+    const viewAnalysisByFid = new Map();
+
+    function setStatus(message) {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.hidden = /로드 완료/.test(message);
+    }
+
+    function setActiveMapButton(mapId) {
+      for (const button of document.querySelectorAll("[data-map]")) {
+        button.classList.toggle("active", button.dataset.map === mapId);
+      }
+    }
+
+    function applyPublicBaseMap(mapId = "street") {
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
+      }
+
+      if (vworldLayer) {
+        viewer.imageryLayers.remove(vworldLayer, true);
+        vworldLayer = null;
+      }
+
+      const config = MAP_CONFIGS[mapId] || MAP_CONFIGS.street;
+      const provider = new Cesium.UrlTemplateImageryProvider({
+        url: config.url,
+        minimumLevel: 0,
+        maximumLevel: 19,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        credit: config.credit
+      });
+
+      publicBaseLayer = viewer.imageryLayers.addImageryProvider(provider, 0);
+      setActiveMapButton(mapId);
+      setStatus(`${config.label} 배경을 적용했습니다.`);
+    }
+
+    function readStoredVworldKey() {
+      const params = new URLSearchParams(window.location.search);
+      const keyFromUrl = (params.get("key") || params.get("vworldKey") || "").trim();
+      if (keyFromUrl) {
+        localStorage.setItem(VWORLD_KEY_STORAGE, keyFromUrl);
+        params.delete("key");
+        params.delete("vworldKey");
+        const cleanQuery = params.toString();
+        const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`;
+        window.history.replaceState({}, document.title, cleanUrl);
+        return keyFromUrl;
+      }
+      return (PUBLIC_VWORLD_KEY || localStorage.getItem(VWORLD_KEY_STORAGE) || "").trim();
+    }
+
+    function stopAutoRotate() {
+      autoRotateActive = false;
+      autoRotateCenter = null;
+      autoRotateLastMs = 0;
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      enable3DControls();
+      setStatus("자동회전을 정지했습니다.");
+    }
+
+    function cameraDistanceTo(center, fallback) {
+      const distance = Cesium.Cartesian3.distance(viewer.camera.positionWC, center);
+      if (!Number.isFinite(distance) || distance < 120 || distance > 3000) return fallback;
+      return distance;
+    }
+
+    function getSelectedRotateCenter() {
+      const entity = viewer.selectedEntity;
+      if (!entity || !entity.positionForSight) return null;
+      const lonLat = xyToLonLat(entity.positionForSight.xy);
+      const height = Math.max(30, Number(entity.positionForSight.height || 80) * 0.45);
+      return Cesium.Cartesian3.fromDegrees(lonLat.lon, lonLat.lat, height);
+    }
+
+    function startAutoRotate(center, range) {
+      autoRotateCenter = center;
+      autoRotateRange = range;
+      autoRotateHeadingDeg = Cesium.Math.toDegrees(viewer.camera.heading || Cesium.Math.toRadians(335));
+      autoRotatePitch = Cesium.Math.toRadians(-38);
+      autoRotateLastMs = performance.now();
+      autoRotateActive = true;
+      enable3DControls();
+    }
+
+    viewer.clock.onTick.addEventListener(() => {
+      if (!autoRotateActive || !autoRotateCenter) return;
+      const now = performance.now();
+      const deltaSeconds = autoRotateLastMs ? Math.min((now - autoRotateLastMs) / 1000, 0.1) : 0;
+      autoRotateLastMs = now;
+      autoRotateHeadingDeg = normalizeAngle(autoRotateHeadingDeg + AUTO_ROTATE_SPEED_DEG_PER_SEC * deltaSeconds);
+      viewer.camera.lookAt(
+        autoRotateCenter,
+        new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(autoRotateHeadingDeg),
+          autoRotatePitch,
+          autoRotateRange
+        )
+      );
+    });
+
+    function colorFromHex(value, fallback, alpha) {
+      const text = String(value || "").trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(text)) {
+        return Cesium.Color.fromCssColorString(text).withAlpha(alpha);
+      }
+      if (/^[0-9a-fA-F]{6}$/.test(text)) {
+        return Cesium.Color.fromCssColorString("#" + text).withAlpha(alpha);
+      }
+      return fallback.withAlpha(alpha);
+    }
+
+    function cssColorFromHex(value, fallback) {
+      const text = String(value || "").trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(text)) return text;
+      if (/^[0-9a-fA-F]{6}$/.test(text)) return "#" + text;
+      return fallback;
+    }
+
+    const ORIGIN_LON = 127.03255;
+    const ORIGIN_LAT = 37.52545;
+    const METERS_PER_DEG_LAT = 110540;
+    const METERS_PER_DEG_LON = 111320 * Math.cos(Cesium.Math.toRadians(ORIGIN_LAT));
+    const EXTERIOR_HULL_TOLERANCE_M = 2;
+    const FACADE_SAMPLE_STEP_M = 2;
+
+    function lonLatToXY(lon, lat) {
+      return {
+        x: (lon - ORIGIN_LON) * METERS_PER_DEG_LON,
+        y: (lat - ORIGIN_LAT) * METERS_PER_DEG_LAT
+      };
+    }
+
+    function xyToLonLat(point) {
+      return {
+        lon: point.x / METERS_PER_DEG_LON + ORIGIN_LON,
+        lat: point.y / METERS_PER_DEG_LAT + ORIGIN_LAT
+      };
+    }
+
+    function distance(a, b) {
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+
+    function vectorLength(v) {
+      return Math.hypot(v.x, v.y);
+    }
+
+    function dot(a, b) {
+      return a.x * b.x + a.y * b.y;
+    }
+
+    function bearingTo(from, to) {
+      const angle = Cesium.Math.toDegrees(Math.atan2(to.x - from.x, to.y - from.y));
+      return (angle + 360) % 360;
+    }
+
+    function normalizeAngle(degrees) {
+      return ((degrees % 360) + 360) % 360;
+    }
+
+    function bearingName(degrees) {
+      const names = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
+      return names[Math.round((((degrees % 360) + 360) % 360) / 45) % 8];
+    }
+
+    function closestPointOnSegment(p, a, b) {
+      const ab = { x: b.x - a.x, y: b.y - a.y };
+      const len2 = ab.x * ab.x + ab.y * ab.y;
+      if (len2 === 0) return a;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / len2));
+      return { x: a.x + ab.x * t, y: a.y + ab.y * t };
+    }
+
+    function closestPointOnPolyline(p, segments) {
+      let best = null;
+      for (const segment of segments) {
+        const candidate = closestPointOnSegment(p, segment.a, segment.b);
+        const d = distance(p, candidate);
+        if (!best || d < best.distance) {
+          best = { point: candidate, distance: d };
+        }
+      }
+      return best;
+    }
+
+    function pointSegmentDistance(point, a, b) {
+      return distance(point, closestPointOnSegment(point, a, b));
+    }
+
+    function cross(o, a, b) {
+      return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    }
+
+    function convexHull(points) {
+      const unique = [];
+      const seen = new Set();
+      for (const point of points) {
+        const key = `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(point);
+        }
+      }
+      if (unique.length <= 3) return unique;
+      unique.sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+      const lower = [];
+      for (const point of unique) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+          lower.pop();
+        }
+        lower.push(point);
+      }
+      const upper = [];
+      for (let i = unique.length - 1; i >= 0; i -= 1) {
+        const point = unique[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+          upper.pop();
+        }
+        upper.push(point);
+      }
+      lower.pop();
+      upper.pop();
+      return lower.concat(upper);
+    }
+
+    function segmentsFromPoints(points) {
+      const segments = [];
+      for (let i = 0; i < points.length; i += 1) {
+        segments.push({ a: points[i], b: points[(i + 1) % points.length] });
+      }
+      return segments;
+    }
+
+    function distanceToSegments(point, segments) {
+      let best = Number.POSITIVE_INFINITY;
+      for (const segment of segments || []) {
+        best = Math.min(best, pointSegmentDistance(point, segment.a, segment.b));
+      }
+      return best;
+    }
+
+    function polylineLength(points) {
+      let total = 0;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        total += distance(points[i], points[i + 1]);
+      }
+      return total;
+    }
+
+    function extendEndpoint(endpoint, neighbor, meters) {
+      const len = distance(endpoint, neighbor);
+      if (!Number.isFinite(len) || len === 0 || meters <= 0) return endpoint;
+      return {
+        x: endpoint.x + ((endpoint.x - neighbor.x) / len) * meters,
+        y: endpoint.y + ((endpoint.y - neighbor.y) / len) * meters
+      };
+    }
+
+    function extendPolyline(points, meters) {
+      if (!points || points.length < 2 || !Number.isFinite(meters) || meters <= 0) {
+        return points.slice();
+      }
+      const extended = points.slice();
+      extended[0] = extendEndpoint(points[0], points[1], meters);
+      extended[extended.length - 1] = extendEndpoint(
+        points[points.length - 1],
+        points[points.length - 2],
+        meters
+      );
+      return extended;
+    }
+
+    function getRiverExtendMeters() {
+      if (!riverExtendInput) return 0;
+      const value = Number(riverExtendInput.value);
+      return Number.isFinite(value) && value > 0 ? value : 0;
+    }
+
+    function raySegmentDistance(origin, bearingDeg, a, b) {
+      const rad = Cesium.Math.toRadians(bearingDeg);
+      const d = { x: Math.sin(rad), y: Math.cos(rad) };
+      const v = { x: b.x - a.x, y: b.y - a.y };
+      const w = { x: a.x - origin.x, y: a.y - origin.y };
+      const cross = d.x * v.y - d.y * v.x;
+      if (Math.abs(cross) < 1e-9) return null;
+      const t = (w.x * v.y - w.y * v.x) / cross;
+      const u = (w.x * d.y - w.y * d.x) / cross;
+      if (t >= 0 && u >= 0 && u <= 1) return t;
+      return null;
+    }
+
+    function ringCentroid(ring) {
+      let x = 0;
+      let y = 0;
+      for (const point of ring) {
+        x += point.x;
+        y += point.y;
+      }
+      return { x: x / ring.length, y: y / ring.length };
+    }
+
+    function ringSegments(ring) {
+      const segments = [];
+      for (let i = 0; i < ring.length; i += 1) {
+        segments.push({ a: ring[i], b: ring[(i + 1) % ring.length], index: i });
+      }
+      return segments;
+    }
+
+    function pointInRing(point, ring) {
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+        const pi = ring[i];
+        const pj = ring[j];
+        const intersects = ((pi.y > point.y) !== (pj.y > point.y)) &&
+          (point.x < ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x);
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pointAlongSegment(a, b, t) {
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t
+      };
+    }
+
+    function sampleFacadeSegments(footprint, stepMeters = 5) {
+      const samples = [];
+      for (const segment of footprint.segments) {
+        const len = distance(segment.a, segment.b);
+        if (!Number.isFinite(len) || len === 0) continue;
+        const count = Math.max(1, Math.ceil(len / stepMeters));
+        for (let i = 0; i < count; i += 1) {
+          const t0 = i / count;
+          const t1 = (i + 1) / count;
+          samples.push({
+            point: pointAlongSegment(segment.a, segment.b, (t0 + t1) / 2),
+            a: pointAlongSegment(segment.a, segment.b, t0),
+            b: pointAlongSegment(segment.a, segment.b, t1),
+            length: len / count,
+            segmentIndex: segment.index
+          });
+        }
+      }
+      return samples;
+    }
+
+    function normalizeRing(coords) {
+      const ring = coords.map(([lon, lat]) => lonLatToXY(lon, lat));
+      const first = ring[0];
+      const last = ring[ring.length - 1];
+      if (first && last && first.x === last.x && first.y === last.y) {
+        ring.pop();
+      }
+      return ring;
+    }
+
+    function prepareFootprints(geojson) {
+      footprints = [];
+      if (!geojson || !geojson.features) return;
+      const dongPointGroups = new Map();
+      for (const feature of geojson.features) {
+        const geometry = feature.geometry;
+        const props = feature.properties || {};
+        if (!geometry) continue;
+        const rings = [];
+        if (geometry.type === "Polygon") {
+          rings.push(normalizeRing(geometry.coordinates[0]));
+        } else if (geometry.type === "MultiPolygon") {
+          for (const polygon of geometry.coordinates) {
+            rings.push(normalizeRing(polygon[0]));
+          }
+        }
+        for (const ring of rings) {
+          const footprint = {
+            fid: props.fid,
+            zoneName: String(props.zone || props.source_zone || "").trim(),
+            dong: props.dong,
+            unitType: String(props.unit_type || "").trim(),
+            floors: normalizedFloorCount(props),
+            piloti: Number(props.piloti_m || 0),
+            floorH: normalizedFloorHeight(props),
+            height: Number(props.height_m || 0),
+            totalHeight: totalBuildingHeight(props),
+            ring,
+            center: ringCentroid(ring),
+            segments: ringSegments(ring)
+          };
+          footprint.groupKey = `${footprint.zoneName}:${footprint.dong || ""}`;
+          footprints.push(footprint);
+
+          const dongKey = footprint.groupKey;
+          if (!dongPointGroups.has(dongKey)) dongPointGroups.set(dongKey, []);
+          dongPointGroups.get(dongKey).push(...ring);
+        }
+      }
+
+      const dongHullSegments = new Map();
+      for (const [dongKey, points] of dongPointGroups.entries()) {
+        const hull = convexHull(points);
+        dongHullSegments.set(dongKey, segmentsFromPoints(hull));
+      }
+
+      for (const footprint of footprints) {
+        const group = dongPointGroups.get(footprint.groupKey) || footprint.ring;
+        footprint.groupCenter = ringCentroid(group);
+        footprint.groupHullSegments = dongHullSegments.get(footprint.groupKey) || footprint.segments;
+      }
+    }
+
+    function buildRiverContext(geojson, extendMeters = 0) {
+      const segments = [];
+      const pointsForScan = [];
+      const linesForDisplay = [];
+      let sourceLength = 0;
+      let analysisLength = 0;
+      let lineCount = 0;
+      if (!geojson || !geojson.features) {
+        return {
+          segments,
+          points: pointsForScan,
+          linesForDisplay,
+          stats: {
+            lineCount: 0,
+            segmentCount: 0,
+            pointCount: 0,
+            sourceLength: 0,
+            analysisLength: 0,
+            extendMeters
+          }
+        };
+      }
+      for (const feature of geojson.features) {
+        const geometry = feature.geometry;
+        if (!geometry) continue;
+        const lines = geometry.type === "LineString" ? [geometry.coordinates] : geometry.coordinates || [];
+        for (const line of lines) {
+          const sourcePoints = line.map(([lon, lat]) => lonLatToXY(lon, lat));
+          if (sourcePoints.length < 2) continue;
+          const points = extendPolyline(sourcePoints, extendMeters);
+          lineCount += 1;
+          sourceLength += polylineLength(sourcePoints);
+          analysisLength += polylineLength(points);
+          linesForDisplay.push(points.map(xyToLonLat));
+          pointsForScan.push(...points);
+          for (let i = 0; i < points.length - 1; i += 1) {
+            const segment = { a: points[i], b: points[i + 1] };
+            segments.push(segment);
+            const segmentLength = distance(segment.a, segment.b);
+            const samples = Math.max(1, Math.floor(segmentLength / 25));
+            for (let j = 1; j < samples; j += 1) {
+              const t = j / samples;
+              pointsForScan.push({
+                x: segment.a.x + (segment.b.x - segment.a.x) * t,
+                y: segment.a.y + (segment.b.y - segment.a.y) * t
+              });
+            }
+          }
+        }
+      }
+      return {
+        segments,
+        points: pointsForScan,
+        linesForDisplay,
+        stats: {
+          lineCount,
+          segmentCount: segments.length,
+          pointCount: pointsForScan.length,
+          sourceLength,
+          analysisLength,
+          extendMeters
+        }
+      };
+    }
+
+    function prepareRiverSegments(geojson, extendMeters = 0) {
+      const context = buildRiverContext(geojson, extendMeters);
+      riverSegments = context.segments;
+      riverPoints = context.points;
+      riverLinesForDisplay = context.linesForDisplay;
+      activeRiverSegments = riverSegments;
+      activeRiverPoints = riverPoints;
+      return context.stats;
+    }
+
+    function nearestRayHit(origin, bearing, segments) {
+      let best = null;
+      for (const segment of segments) {
+        const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
+        if (t !== null && t > 0 && (!best || t < best.distance)) {
+          best = { distance: t, segment };
+        }
+      }
+      return best;
+    }
+
+    function rayReachesRiver(origin, bearing, expectedDistance) {
+      const hit = nearestRayHit(origin, bearing, activeRiverSegments);
+      if (!hit || !Number.isFinite(hit.distance)) return false;
+      if (Number.isFinite(expectedDistance)) {
+        return Math.abs(hit.distance - expectedDistance) <= 2.5;
+      }
+      return hit.distance > 2;
+    }
+
+    function blockerOcclusionHeight(footprint) {
+      const baseHeight = Number(footprint.totalHeight || footprint.height || 0);
+      const floorH = Number.isFinite(footprint.floorH) && footprint.floorH > 0 ? footprint.floorH : 3.692;
+      return baseHeight + floorH * BLOCKER_PENTHOUSE_FLOORS;
+    }
+
+    function blockerOcclusionFloors(footprint) {
+      return Number(footprint.floors || 0) + BLOCKER_PENTHOUSE_FLOORS;
+    }
+
+    function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
+      let internalBlocked = false;
+      const hits = [];
+
+      for (const footprint of footprints) {
+        if (String(footprint.fid) === String(sourceFootprint.fid)) continue;
+        for (const segment of footprint.segments) {
+          const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
+          if (t === null || t <= 2 || t >= maxDistance) continue;
+
+          if (String(footprint.groupKey) === String(sourceFootprint.groupKey)) {
+            internalBlocked = true;
+            continue;
+          }
+
+          hits.push({
+            zoneName: footprint.zoneName,
+            dong: footprint.dong,
+            unitType: footprint.unitType,
+            distance: t,
+            height: blockerOcclusionHeight(footprint),
+            floors: blockerOcclusionFloors(footprint)
+          });
+        }
+      }
+
+      hits.sort((a, b) => a.distance - b.distance);
+      let maxBlockerHeight = 0;
+      const effectiveBlockers = [];
+      for (const hit of hits) {
+        if (hit.height > maxBlockerHeight) {
+          maxBlockerHeight = hit.height;
+          effectiveBlockers.push(hit);
+        }
+      }
+
+      return {
+        internalBlocked,
+        maxBlockerHeight,
+        blockers: effectiveBlockers
+      };
+    }
+
+    function floorEyeHeight(footprint, floor) {
+      const piloti = Number.isFinite(footprint.piloti) ? footprint.piloti : 0;
+      const floorH = Number.isFinite(footprint.floorH) && footprint.floorH > 0 ? footprint.floorH : 3.3;
+      const raw = piloti + Math.max(0, floor - 0.5) * floorH;
+      const capHeight = Number(footprint.totalHeight || footprint.height || 0);
+      return capHeight > 0 ? Math.min(raw, capHeight + 1.5) : raw;
+    }
+
+    function viewRayLeavesBuilding(samplePoint, targetPoint, footprint) {
+      const d = distance(samplePoint, targetPoint);
+      if (!Number.isFinite(d) || d === 0) return false;
+      const testPoint = {
+        x: samplePoint.x + ((targetPoint.x - samplePoint.x) / d) * 0.8,
+        y: samplePoint.y + ((targetPoint.y - samplePoint.y) / d) * 0.8
+      };
+      if (pointInRing(testPoint, footprint.ring)) return false;
+
+      return distanceToSegments(samplePoint, footprint.groupHullSegments) <= EXTERIOR_HULL_TOLERANCE_M;
+    }
+
+    function addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays) {
+      const directionName = bearingName(ray.angle);
+      allOpenRays.push(ray);
+      if (!openRaysByDirection[directionName]) openRaysByDirection[directionName] = [];
+      openRaysByDirection[directionName].push(ray);
+      if (!openByDirection[directionName]) openByDirection[directionName] = [];
+      openByDirection[directionName].push(ray);
+    }
+
+    function isBetterAngleProfile(candidate, current) {
+      if (!current) return true;
+      const candidateHeight = Number(candidate.blockerHeight || 0);
+      const currentHeight = Number(current.blockerHeight || 0);
+      if (candidateHeight !== currentHeight) return candidateHeight < currentHeight;
+      return Number(candidate.distance || 0) < Number(current.distance || 0);
+    }
+
+    function buildAngleProfiles(candidates) {
+      const byAngle = new Map();
+      for (const candidate of candidates) {
+        if (!byAngle.has(candidate.angle)) byAngle.set(candidate.angle, []);
+        byAngle.get(candidate.angle).push(candidate);
+      }
+
+      return [...byAngle.entries()]
+        .map(([angle, angleCandidates]) => {
+          const representative = angleCandidates.reduce((best, candidate) =>
+            isBetterAngleProfile(candidate, best) ? candidate : best, null);
+          const maxBlockerHeight = angleCandidates.reduce((maxHeight, candidate) =>
+            Math.max(maxHeight, Number(candidate.blockerHeight || 0)), 0);
+          return {
+            angle,
+            order: angle,
+            distance: representative.distance,
+            origin: representative.origin,
+            end: representative.end,
+            blockerHeight: maxBlockerHeight,
+            blockers: representative.blockers,
+            sample: representative.sample,
+            candidates: angleCandidates
+          };
+        })
+        .sort((a, b) => a.order - b.order);
+    }
+
+    function firstBlockingBlocker(blockers, observerHeight) {
+      return (blockers || [])
+        .slice()
+        .sort((a, b) => a.distance - b.distance)
+        .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
+    }
+
+    function openCandidateForFloor(profile, observerHeight) {
+      const candidates = profile.candidates || [profile];
+      if (!candidates.length) return null;
+      const openCandidates = candidates.filter(candidate =>
+        Number(candidate.blockerHeight || 0) < observerHeight
+      );
+      if ((openCandidates.length / candidates.length) < ANGLE_OPEN_RATIO_THRESHOLD) return null;
+      return openCandidates.reduce((best, candidate) =>
+        isBetterAngleProfile(candidate, best) ? candidate : best, null);
+    }
+
+    function blockingBlockerForFloor(profile, observerHeight) {
+      const candidates = profile.candidates || [profile];
+      const blockers = [];
+      for (const candidate of candidates) {
+        if (Number(candidate.blockerHeight || 0) >= observerHeight) {
+          blockers.push(...(candidate.blockers || []));
+        }
+      }
+      return firstBlockingBlocker(blockers, observerHeight);
+    }
+
+    function collectFacadeCandidates(footprint) {
+      const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
+      const blockers = new Map();
+      const candidates = [];
+
+      for (const sample of samples) {
+        for (const target of activeRiverPoints) {
+          if (!viewRayLeavesBuilding(sample.point, target, footprint)) continue;
+          const exactAngle = bearingTo(sample.point, target);
+          const angle = normalizeAngle(Math.round(exactAngle));
+          const targetDistance = distance(sample.point, target);
+          if (!rayReachesRiver(sample.point, exactAngle, targetDistance)) continue;
+          const blockerProfile = rayBlockerProfile(sample.point, exactAngle, targetDistance, footprint);
+          if (blockerProfile.internalBlocked) continue;
+
+          for (const blocker of blockerProfile.blockers) {
+            const key = `${blocker.zoneName || ""}:${blocker.dong}동`;
+            const current = blockers.get(key);
+            if (!current || blocker.distance < current.distance) blockers.set(key, blocker);
+          }
+
+          candidates.push({
+            angle,
+            distance: targetDistance,
+            origin: sample.point,
+            end: target,
+            blockerHeight: blockerProfile.maxBlockerHeight,
+            blockers: blockerProfile.blockers,
+            sample
+          });
+        }
+      }
+
+      return {
+        samples,
+        candidates,
+        angleProfiles: buildAngleProfiles(candidates),
+        blockers: [...blockers.values()].sort((a, b) => a.distance - b.distance)
+      };
+    }
+
+    function summarizeFacadeCandidates(footprint, candidateData, observerHeight) {
+      const openByDirection = {};
+      const openRaysByDirection = {};
+      const allOpenRays = [];
+      const potentialAngles = new Set();
+      const visibleFacadeSegments = [];
+      const visibleSamples = new Set();
+      const blockingFloorSet = new Set();
+      const blockingBlockers = new Map();
+      let visibleFacadeLength = 0;
+      let visibleSampleCount = 0;
+
+      const angleProfiles = candidateData.angleProfiles || [];
+
+      for (const profile of angleProfiles) {
+        potentialAngles.add(profile.angle);
+        const openCandidate = openCandidateForFloor(profile, observerHeight);
+        if (!openCandidate) {
+          const activeBlocker = blockingBlockerForFloor(profile, observerHeight);
+          if (activeBlocker) {
+            blockingFloorSet.add(Math.round(activeBlocker.floors));
+            const key = `${activeBlocker.zoneName || ""}:${activeBlocker.dong || ""}`;
+            if (!blockingBlockers.has(key)) blockingBlockers.set(key, activeBlocker);
+          }
+          continue;
+        }
+
+        const ray = {
+          angle: profile.angle,
+          order: profile.angle,
+          distance: openCandidate.distance,
+          origin: openCandidate.origin,
+          end: openCandidate.end
+        };
+        addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays);
+
+        if (!visibleSamples.has(openCandidate.sample)) {
+          visibleSamples.add(openCandidate.sample);
+          visibleSampleCount += 1;
+          visibleFacadeLength += openCandidate.sample.length;
+          visibleFacadeSegments.push({
+            a: openCandidate.sample.a,
+            b: openCandidate.sample.b
+          });
+        }
+      }
+
+      const directionSummaries = {};
+      for (const [directionName, rays] of Object.entries(openByDirection)) {
+        directionSummaries[directionName] = summarizeOpenGaps(rays.sort((a, b) => a.order - b.order));
+      }
+
+      const potentialRays = [...potentialAngles]
+        .sort((a, b) => a - b)
+        .map(angle => ({ angle, order: angle, distance: 0 }));
+      const targetSummary = summarizeOpenGaps(potentialRays);
+      const allOpenSummary = summarizeOpenGaps(allOpenRays.sort((a, b) => a.order - b.order));
+
+      return {
+        openByDirection: directionSummaries,
+        openRaysByDirection,
+        allOpenSummary,
+        allOpenRays,
+        totalOpen: allOpenSummary.total,
+        targetSpan: targetSummary.total,
+        observerHeight,
+        visibleFacadeLength,
+        visibleFacadeSegments,
+        visibleSampleCount,
+        sampleCount: candidateData.samples.length,
+        blockingFloors: [...blockingFloorSet].sort((a, b) => a - b),
+        blockingBlockers: [...blockingBlockers.values()].sort((a, b) => a.distance - b.distance),
+        blockers: candidateData.blockers
+      };
+    }
+
+    function buildFloorBands(footprint, candidateData) {
+      const floorCount = Math.max(1, Math.round(footprint.floors || 1));
+      const bands = [];
+      let previous = null;
+
+      for (let floor = 1; floor <= floorCount; floor += 1) {
+        const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
+        const comparable = {
+          totalOpen: summary.totalOpen
+        };
+
+        if (!previous) {
+          previous = { start: floor, end: floor, comparable, summary };
+          continue;
+        }
+
+        const same = comparable.totalOpen === previous.comparable.totalOpen;
+
+        if (same) {
+          previous.end = floor;
+        } else {
+          bands.push(previous);
+          previous = { start: floor, end: floor, comparable, summary };
+        }
+      }
+
+      if (previous) bands.push(previous);
+      return bands;
+    }
+
+    function clearSelectedSightLines() {
+      while (selectedSightEntities.length) {
+        viewer.entities.remove(selectedSightEntities.pop());
+      }
+    }
+
+    function largestGap(summary) {
+      if (!summary || !summary.gaps || !summary.gaps.length) return null;
+      return summary.gaps
+        .slice()
+        .sort((a, b) => b.size - a.size)[0];
+    }
+
+    function formatAngleRange(summary) {
+      const gap = largestGap(summary);
+      if (!gap) return "없음";
+      return `${Math.round(gap.start.angle)}도 ~ ${Math.round(gap.end.angle)}도 (${gap.size}도)`;
+    }
+
+    function angleWithinGap(angle, gap) {
+      if (!gap) return false;
+      const start = normalizeAngle(gap.start.angle);
+      const end = normalizeAngle(gap.end.angle);
+      const value = normalizeAngle(angle);
+      return start <= end ? value >= start && value <= end : value >= start || value <= end;
+    }
+
+    function representativeRayForGap(analysis, gap) {
+      const rays = (analysis.allOpenRays || [])
+        .filter(ray => angleWithinGap(ray.angle, gap))
+        .sort((a, b) => a.distance - b.distance);
+      if (!rays.length) return null;
+      return rays[Math.floor(rays.length / 2)];
+    }
+
+    function rayEndFromOrigin(origin, angle, fallbackDistance) {
+      const hit = nearestRayHit(origin, angle, activeRiverSegments);
+      const d = hit && Number.isFinite(hit.distance) ? hit.distance : fallbackDistance;
+      const rad = Cesium.Math.toRadians(angle);
+      return {
+        x: origin.x + Math.sin(rad) * d,
+        y: origin.y + Math.cos(rad) * d
+      };
+    }
+
+    function summarizeOpenGaps(openRays) {
+      if (!openRays.length) {
+        return { total: 0, gapCount: 0, maxGap: 0, gaps: [] };
+      }
+      const buildGap = (start, end, rays) => {
+        const distances = rays.map(ray => ray.distance).filter(value => Number.isFinite(value));
+        const distanceMin = distances.length ? Math.min(...distances) : 0;
+        const distanceMax = distances.length ? Math.max(...distances) : 0;
+        const distanceAvg = distances.length
+          ? distances.reduce((sum, value) => sum + value, 0) / distances.length
+          : 0;
+        return {
+          start,
+          end,
+          size: Math.round(end.order - start.order + 1),
+          distanceMin,
+          distanceMax,
+          distanceAvg
+        };
+      };
+      const gaps = [];
+      let start = openRays[0];
+      let prev = openRays[0];
+      let currentRays = [openRays[0]];
+      for (let i = 1; i < openRays.length; i += 1) {
+        const ray = openRays[i];
+        const diff = ((ray.order - prev.order) + 360) % 360;
+        if (diff <= 1.01) {
+          currentRays.push(ray);
+          prev = ray;
+        } else {
+          gaps.push(buildGap(start, prev, currentRays));
+          start = ray;
+          prev = ray;
+          currentRays = [ray];
+        }
+      }
+      gaps.push(buildGap(start, prev, currentRays));
+      if (
+        gaps.length > 1 &&
+        gaps[0].start.order === 0 &&
+        gaps[gaps.length - 1].end.order === 359
+      ) {
+        const first = gaps.shift();
+        const last = gaps.pop();
+        gaps.unshift({
+          start: last.start,
+          end: first.end,
+          size: last.size + first.size,
+          distanceMin: Math.min(last.distanceMin, first.distanceMin),
+          distanceMax: Math.max(last.distanceMax, first.distanceMax),
+          distanceAvg: (last.distanceAvg + first.distanceAvg) / 2
+        });
+      }
+      const total = gaps.reduce((sum, gap) => sum + gap.size, 0);
+      const maxGap = gaps.reduce((max, gap) => Math.max(max, gap.size), 0);
+      return { total, gapCount: gaps.length, maxGap, gaps };
+    }
+
+    function angularScanForRiver(origin) {
+      const bearings = activeRiverPoints
+        .map(point => bearingTo(origin, point))
+        .filter(value => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!bearings.length) return { angles: [], targetSpan: 0, start: null, end: null };
+      if (bearings.length === 1) {
+        const angle = Math.round(bearings[0]);
+        return { angles: [angle], targetSpan: 1, start: angle, end: angle };
+      }
+
+      let largestGap = -1;
+      let gapIndex = 0;
+      for (let i = 0; i < bearings.length; i += 1) {
+        const current = bearings[i];
+        const next = bearings[(i + 1) % bearings.length] + (i === bearings.length - 1 ? 360 : 0);
+        const gap = next - current;
+        if (gap > largestGap) {
+          largestGap = gap;
+          gapIndex = i;
+        }
+      }
+
+      const start = bearings[(gapIndex + 1) % bearings.length];
+      const end = bearings[gapIndex];
+      const span = Math.max(0, 360 - largestGap);
+      const angles = [];
+      const seen = new Set();
+      for (let offset = 0; offset <= span; offset += 1) {
+        const angle = (Math.round(start + offset) + 360) % 360;
+        if (!seen.has(angle)) {
+          seen.add(angle);
+          angles.push(angle);
+        }
+      }
+      return { angles, targetSpan: Math.round(span), start, end };
+    }
+
+    function normalizeZoneId(value) {
+      const text = String(value || "").trim();
+      if (text.includes("2")) return "2";
+      if (text.includes("3")) return "3";
+      if (text.includes("4")) return "4";
+      if (text.includes("5")) return "5";
+      return text;
+    }
+
+    function normalizedFloorCount(props) {
+      return Number(props.floors || 0);
+    }
+
+    function normalizedFloorHeight(props) {
+      const raw = Number(props.floor_h);
+      if (Number.isFinite(raw) && raw > 0 && raw < 20) return raw;
+      if (Number.isFinite(raw) && raw >= 1000 && raw < 10000) return raw / 1000;
+      const zoneId = normalizeZoneId(props.zone || props.source_zone || "");
+      if (zoneId === "2" || zoneId === "3") return 3.692;
+      const floors = normalizedFloorCount(props);
+      const piloti = Number(props.piloti_m || 0);
+      const height = Number(props.height_m || props.height || 0);
+      if (floors > 0 && height > piloti) return (height - piloti) / floors;
+      return 3.692;
+    }
+
+    function totalBuildingHeight(props) {
+      const floors = normalizedFloorCount(props);
+      const floorH = normalizedFloorHeight(props);
+      const piloti = Number(props.piloti_m || 0);
+      const height = Number(props.height_m || props.height || 0);
+      const bodyHeight = floors > 0 && floorH > 0 ? floors * floorH : 0;
+      const expectedTotal = bodyHeight + piloti;
+      const tolerance = 0.25;
+
+      if (!Number.isFinite(height) || height <= 0) {
+        return expectedTotal > 0 ? expectedTotal : 20;
+      }
+      if (bodyHeight > 0 && Math.abs(height - bodyHeight) <= tolerance) {
+        return height + piloti;
+      }
+      if (expectedTotal > 0 && Math.abs(height - expectedTotal) <= tolerance) {
+        return height;
+      }
+      if (piloti > 0 && bodyHeight > 0 && height < expectedTotal - piloti * 0.45) {
+        return height + piloti;
+      }
+      return height;
+    }
+
+    function riverContextForFootprint(footprint) {
+      const zoneId = normalizeZoneId(footprint.zoneName);
+      return riverContextsByZone.get(zoneId) || {
+        segments: riverSegments,
+        points: riverPoints,
+        linesForDisplay: riverLinesForDisplay,
+        stats: lastRiverStats
+      };
+    }
+
+    function analyzeViews() {
+      viewAnalysisByFid.clear();
+      if (!riverSegments.length || !footprints.length) return;
+
+      for (const footprint of footprints) {
+        const riverContext = riverContextForFootprint(footprint);
+        if (!riverContext || !riverContext.segments.length || !riverContext.points.length) continue;
+        activeRiverSegments = riverContext.segments;
+        activeRiverPoints = riverContext.points;
+        const closest = closestPointOnPolyline(footprint.center, activeRiverSegments);
+        const direction = closest ? bearingTo(footprint.center, closest.point) : null;
+        const candidateData = collectFacadeCandidates(footprint);
+        const floorBands = buildFloorBands(footprint, candidateData);
+        const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
+        const facadeView = summarizeFacadeCandidates(
+          footprint,
+          candidateData,
+          floorEyeHeight(footprint, displayFloor)
+        );
+        const totalOpen = facadeView.totalOpen;
+        const grade = totalOpen >= 60 ? "전면 조망" :
+          totalOpen >= 30 ? "양호한 부분 조망" :
+          totalOpen >= 10 ? "틈새 조망" :
+          facadeView.visibleFacadeLength > 0 ? "제한적 조망" : "차폐";
+
+        viewAnalysisByFid.set(String(footprint.fid), {
+          riverDistance: closest ? closest.distance : null,
+          riverBearing: direction,
+          riverBearingName: direction === null ? "" : bearingName(direction),
+          targetSpan: facadeView.targetSpan,
+          openByDirection: facadeView.openByDirection,
+          openRaysByDirection: facadeView.openRaysByDirection,
+          allOpenSummary: facadeView.allOpenSummary,
+          allOpenRays: facadeView.allOpenRays,
+          totalOpen,
+          visibleFacadeLength: facadeView.visibleFacadeLength,
+          visibleFacadeSegments: facadeView.visibleFacadeSegments,
+          visibleSampleCount: facadeView.visibleSampleCount,
+          sampleCount: facadeView.sampleCount,
+          floorBands,
+          displayFloor,
+          displayEyeHeight: facadeView.observerHeight,
+          blockers: facadeView.blockers.slice(0, 3),
+          grade
+        });
+      }
+
+      activeRiverSegments = riverSegments;
+      activeRiverPoints = riverPoints;
+    }
+
+    function clearOutlines() {
+      while (overlayEntities.length) {
+        viewer.entities.remove(overlayEntities.pop());
+      }
+    }
+
+    function clearRiverLines() {
+      while (riverLineEntities.length) {
+        viewer.entities.remove(riverLineEntities.pop());
+      }
+    }
+
+    function drawRiverLines() {
+      clearRiverLines();
+      for (const line of riverLinesForDisplay) {
+        if (!line || line.length < 2) continue;
+        const degrees = [];
+        for (const point of line) {
+          degrees.push(point.lon, point.lat, 3);
+        }
+        riverLineEntities.push(viewer.entities.add({
+          name: "조망 계산용 한강라인",
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights(degrees),
+            width: 5,
+            material: Cesium.Color.fromCssColorString("#00d4ff").withAlpha(0.9),
+            clampToGround: false
+          }
+        }));
+      }
+    }
+
+    function addSharpOutlineAndLabel(entity, height, labelText, unitType, filterKey = unitType) {
+      const hierarchy = entity.polygon.hierarchy && entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
+      if (!hierarchy || !hierarchy.positions) return;
+
+      const outlineColor = Cesium.Color.fromCssColorString("#2f343a").withAlpha(0.95);
+      const positions = hierarchy.positions.concat([hierarchy.positions[0]]);
+      const topDegrees = [];
+      let lonSum = 0;
+      let latSum = 0;
+      for (const position of positions) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        const lon = Cesium.Math.toDegrees(cartographic.longitude);
+        const lat = Cesium.Math.toDegrees(cartographic.latitude);
+        topDegrees.push(lon);
+        topDegrees.push(lat);
+        topDegrees.push(height);
+      }
+      for (const position of hierarchy.positions) {
+        const cartographic = Cesium.Cartographic.fromCartesian(position);
+        lonSum += Cesium.Math.toDegrees(cartographic.longitude);
+        latSum += Cesium.Math.toDegrees(cartographic.latitude);
+      }
+      const centerLon = lonSum / hierarchy.positions.length;
+      const centerLat = latSum / hierarchy.positions.length;
+
+      const bottomOutline = viewer.entities.add({
+        name: `${entity.name} 외곽선`,
+        unitType: filterKey,
+        polyline: {
+          positions,
+          width: 1,
+          material: outlineColor,
+          clampToGround: false
+        }
+      });
+      overlayEntities.push(bottomOutline);
+
+      const topOutline = viewer.entities.add({
+        name: `${entity.name} 상단 외곽선`,
+        unitType: filterKey,
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights(topDegrees),
+          width: 1,
+          material: outlineColor,
+          clampToGround: false
+        }
+      });
+      overlayEntities.push(topOutline);
+
+      const groundPositions = hierarchy.positions;
+      for (let i = 0; i < groundPositions.length; i += 1) {
+        const cartographic = Cesium.Cartographic.fromCartesian(groundPositions[i]);
+        const lon = Cesium.Math.toDegrees(cartographic.longitude);
+        const lat = Cesium.Math.toDegrees(cartographic.latitude);
+        const sideOutline = viewer.entities.add({
+          unitType: filterKey,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+              lon, lat, 0,
+              lon, lat, height
+            ]),
+            width: 1,
+            material: outlineColor,
+              clampToGround: false
+            }
+        });
+        overlayEntities.push(sideOutline);
+      }
+
+      if (labelText) {
+        const labelEntity = viewer.entities.add({
+          name: `${entity.name} 라벨`,
+          unitType: filterKey,
+          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height + 2),
+          label: {
+            text: labelText,
+            font: "bold 15px Arial, Malgun Gothic, sans-serif",
+            fillColor: Cesium.Color.fromCssColorString("#111827"),
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            pixelOffset: new Cesium.Cartesian2(0, 0),
+            scaleByDistance: new Cesium.NearFarScalar(250, 1.15, 3000, 0.45)
+          }
+        });
+        overlayEntities.push(labelEntity);
+      }
+    }
+
+    function setOverlayVisible(unitType, visible) {
+      for (const overlay of overlayEntities) {
+        if (overlay.unitType === unitType) overlay.show = visible;
+      }
+    }
+
+    function applyUnitFilter(unitType) {
+      currentFilter = unitType;
+      if (!unitsDataSource) return;
+      const filterText = String(unitType);
+      const zonePrefix = "ZONE:";
+      const isZoneFilter = filterText.startsWith(zonePrefix);
+      const zoneName = isZoneFilter ? filterText.slice(zonePrefix.length) : "";
+      const zoneSpecificFilter = currentZoneId === "ALL" && !isZoneFilter && filterText.includes(":");
+      const targetZoneName = zoneSpecificFilter ? filterText.split(":")[0] : "";
+
+      function isEntityHighlighted(entity) {
+        if (unitType === "ALL" || isZoneFilter) return true;
+        if (zoneSpecificFilter && entity.zoneName !== targetZoneName) return true;
+        return entity.filterKey === unitType;
+      }
+
+      function isOverlayHighlighted(overlay) {
+        if (unitType === "ALL" || isZoneFilter) return true;
+        if (zoneSpecificFilter && !String(overlay.unitType || "").startsWith(`${targetZoneName}:`)) return true;
+        return overlay.unitType === unitType;
+      }
+
+      for (const entity of unitsDataSource.entities.values) {
+        if (!entity.polygon) continue;
+        const selected = isEntityHighlighted(entity);
+        const opacity = selected ? 1 : 0.16;
+        entity.show = true;
+        entity.polygon.material = entity.baseColor.withAlpha(opacity);
+      }
+
+      for (const overlay of overlayEntities) {
+        const selected = isOverlayHighlighted(overlay);
+        overlay.show = selected;
+      }
+
+      for (const button of legendEl.querySelectorAll("button")) {
+        button.classList.toggle("active", button.dataset.unitType === unitType);
+      }
+    }
+
+    function buildLegend(items, allFilter = "ALL", allLabel = "전체") {
+      legendEl.innerHTML = "";
+      const allButton = document.createElement("button");
+      allButton.type = "button";
+      allButton.dataset.unitType = allFilter;
+      allButton.className = currentFilter === allFilter ? "active" : "";
+      allButton.textContent = allLabel;
+      allButton.addEventListener("click", () => applyUnitFilter(allFilter));
+      legendEl.appendChild(allButton);
+
+      for (const item of items) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.unitType = item.filterKey;
+        button.className = currentFilter === item.filterKey ? "active" : "";
+        button.innerHTML = `<span class="swatch" style="background:${item.color}"></span>${item.label}`;
+        button.addEventListener("click", () => applyUnitFilter(item.filterKey));
+        legendEl.appendChild(button);
+      }
+    }
+
+    function buildDefaultLegend() {
+      if (currentZoneId === "ALL") {
+        buildLegend([], "ALL", "전체");
+        return;
+      }
+      buildLegend(loadedLegendItems, "ALL", "전체");
+    }
+
+    function showLegendForSelectedEntity(entity) {
+      if (currentZoneId !== "ALL" || !entity || !entity.zoneName) return;
+      const zoneName = entity.zoneName;
+      const zoneItems = loadedLegendItems.filter(item => item.zoneName === zoneName);
+      buildLegend(zoneItems, `ZONE:${zoneName}`, `${zoneName} 전체`);
+      applyUnitFilter(`ZONE:${zoneName}`);
+    }
+
+    function drawSelectedSightLines(entity) {
+      clearSelectedSightLines();
+      if (!entity || !entity.fidValue) return;
+      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
+      if (!analysis || !entity.positionForSight) return;
+
+      const baseHeight = entity.positionForSight.height + 5;
+      const facadeColor = Cesium.Color.fromCssColorString("#16a34a").withAlpha(0.98);
+
+      for (const segment of analysis.visibleFacadeSegments || []) {
+        const a = xyToLonLat(segment.a);
+        const b = xyToLonLat(segment.b);
+        selectedSightEntities.push(viewer.entities.add({
+          name: `${entity.name} 조망 가능 외곽선`,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+              a.lon, a.lat, baseHeight,
+              b.lon, b.lat, baseHeight
+            ]),
+            width: 7,
+            material: facadeColor,
+            clampToGround: false
+          }
+        }));
+      }
+    }
+
+    function formatDistanceRange(rays) {
+      if (!rays || !rays.length) return "0 m";
+      const distances = rays.map(ray => ray.distance).filter(value => Number.isFinite(value));
+      if (!distances.length) return "0 m";
+      const min = Math.round(Math.min(...distances));
+      const max = Math.round(Math.max(...distances));
+      const avg = Math.round(distances.reduce((sum, value) => sum + value, 0) / distances.length);
+      return min === max ? `${min} m` : `${min}~${max} m (평균 ${avg} m)`;
+    }
+
+    function formatOpenGapDetails(summary) {
+      if (!summary || !summary.gaps || !summary.gaps.length) return "없음";
+      return summary.gaps
+        .slice()
+        .sort((a, b) => a.start.order - b.start.order)
+        .map(gap => {
+          const start = Math.round(gap.start.angle);
+          const end = Math.round(gap.end.angle);
+          const min = Math.round(gap.distanceMin);
+          const max = Math.round(gap.distanceMax);
+          const distanceText = min === max ? `${min}m` : `${min}~${max}m`;
+          return `${start}~${end}도 ${gap.size}도 / ${distanceText}`;
+        })
+        .join(" · ");
+    }
+
+    function formatDirectionSummary(analysis) {
+      if (!analysis) return "계산 전";
+      const order = ["서", "북서", "북", "북동", "동", "남동", "남", "남서"];
+      const entries = Object.entries(analysis.openByDirection || {})
+        .filter(([, summary]) => summary && summary.total > 0)
+        .sort(([a], [b]) => {
+          const ai = order.indexOf(a);
+          const bi = order.indexOf(b);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        })
+        .map(([name, summary]) => `${name} ${summary.total}도`);
+      return entries.length ? entries.join(" / ") : "0도";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatUnitType(value) {
+      const text = String(value ?? "").trim();
+      if (!text) return "";
+      return /py|평/i.test(text) ? escapeHtml(text) : `${escapeHtml(text)} PY`;
+    }
+
+    function formatDong(value) {
+      const text = String(value ?? "").trim();
+      if (!text) return "";
+      return /동$/.test(text) ? escapeHtml(text) : `${escapeHtml(text)}동`;
+    }
+
+    function formatFloorCount(value) {
+      const floor = Math.round(Number(value || 0));
+      return floor > 0 ? `${floor}층` : "";
+    }
+
+    function formatFloorBandLabel(band, floorCount) {
+      if (band.start === 1 && band.end < floorCount) return `${band.end}층 이하`;
+      if (band.end === floorCount && band.start > 1) return `${band.start}층부터`;
+      if (band.start === 1 && band.end === floorCount) return "전층";
+      if (band.start === band.end) return `${band.start}층`;
+      return `${band.start}~${band.end}층`;
+    }
+
+    function floorBandColor(index) {
+      return ["#60a5fa", "#34d399", "#fbbf24", "#fb7185"][index % 4];
+    }
+
+    function formatFloorBandItem(label, riverAngle, index) {
+      return `<span style="display:inline-block; margin-right:10px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(riverAngle)}도</span>`;
+    }
+
+    function formatFloorBands(analysis) {
+      if (!analysis || !analysis.floorBands || !analysis.floorBands.length) return "계산 전";
+      const floorCount = analysis.displayFloor;
+      const bands = analysis.floorBands;
+      if (bands.length === 1) {
+        const only = bands[0];
+        return formatFloorBandItem(
+          "전층",
+          only.summary.totalOpen,
+          0
+        );
+      }
+      const items = bands.map((band, index) => {
+        const label = formatFloorBandLabel(band, floorCount);
+        const riverAngle = band.summary.totalOpen;
+        return formatFloorBandItem(label, riverAngle, index);
+      });
+      return items.join("");
+    }
+
+    function buildDescription(props) {
+      const analysis = viewAnalysisByFid.get(String(props.fid));
+      const rows = [
+        ["구역", escapeHtml(props.zone || props.source_zone || "")],
+        ["동", formatDong(props.dong)],
+        ["타입", formatUnitType(props.unit_type)],
+        ["최고층", formatFloorCount(normalizedFloorCount(props))],
+        ["최고층 조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
+        ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
+      ];
+      return `
+        <table class="selection-detail-table">
+          <tbody>
+            ${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v ?? ""}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function propsFromEntity(entity) {
+      const props = {};
+      const propertyNames = entity.properties ? entity.properties.propertyNames : [];
+      for (const name of propertyNames) {
+        props[name] = entity.properties[name].getValue(Cesium.JulianDate.now());
+      }
+      return props;
+    }
+
+    function updateSelectionDetails(entity) {
+      if (!selectionDetailTitleEl || !selectionDetailBodyEl) return;
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        selectionDetailTitleEl.textContent = "선택 상세";
+        selectionDetailBodyEl.innerHTML = '<div class="selection-detail-empty">유닛을 클릭하면 상세설명이 표시됩니다.</div>';
+        return;
+      }
+
+      const props = propsFromEntity(entity);
+      selectionDetailTitleEl.textContent = entity.name || "선택 상세";
+      selectionDetailBodyEl.innerHTML = buildDescription(props);
+    }
+
+    function refreshLoadedDescriptions() {
+      if (!unitsDataSource) return;
+      for (const entity of unitsDataSource.entities.values) {
+        if (!entity.polygon) continue;
+        entity.description = buildDescription(propsFromEntity(entity));
+      }
+    }
+
+    function riverStatusText() {
+      if (!lastRiverStats) return "한강라인: 미로드";
+      return [
+        `한강라인: ${lastRiverStats.lineCount}개`,
+        `원본 길이: ${Math.round(lastRiverStats.sourceLength)} m`,
+        `계산 길이: ${Math.round(lastRiverStats.analysisLength)} m`,
+        `끝단 확장: ${Math.round(lastRiverStats.extendMeters)} m`,
+        `스캔점: ${lastRiverStats.pointCount}개`
+      ].join("\n");
+    }
+
+    function rebuildRiverContexts() {
+      riverContextsByZone.clear();
+      const extendMeters = getRiverExtendMeters();
+      for (const [zoneId, data] of riverRawGeoJsonByZone.entries()) {
+        riverContextsByZone.set(zoneId, buildRiverContext(data, extendMeters));
+      }
+    }
+
+    function recalculateViews(message = "조망 계산 갱신 완료") {
+      if (!riverRawGeoJson) {
+        setStatus("한강라인 GeoJSON이 아직 로드되지 않았습니다.");
+        return;
+      }
+      rebuildRiverContexts();
+      lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
+      drawRiverLines();
+      analyzeViews();
+      refreshLoadedDescriptions();
+      setStatus(`${message}\n${riverStatusText()}\n유닛 수: ${footprints.length}`);
+      if (viewer.selectedEntity) {
+        drawSelectedSightLines(viewer.selectedEntity);
+        updateSelectionDetails(viewer.selectedEntity);
+      }
+    }
+
+    async function loadGeoJson(input, loadedLabel = "") {
+      if (unitsDataSource) {
+        viewer.dataSources.remove(unitsDataSource, true);
+        unitsDataSource = null;
+      }
+      viewer.selectedEntity = undefined;
+      updateSelectionDetails(null);
+      clearOutlines();
+      clearSelectedSightLines();
+      prepareFootprints(input);
+      analyzeViews();
+
+      const source = await Cesium.GeoJsonDataSource.load(input, {
+        clampToGround: false,
+        stroke: Cesium.Color.TRANSPARENT,
+        fill: Cesium.Color.RED,
+        strokeWidth: 0
+      });
+
+      const entities = source.entities.values;
+      let validCount = 0;
+      let maxHeight = 0;
+      const legendMap = new Map();
+
+      for (const entity of entities) {
+        if (!entity.polygon) continue;
+
+        const props = propsFromEntity(entity);
+
+        const finalHeight = totalBuildingHeight(props);
+        const fill = colorFromHex(props.fill_color, Cesium.Color.RED, 1);
+        const unitType = String(props.unit_type || "").trim();
+        const typeLabel = unitType ? `${unitType}PY` : "";
+        const cssColor = cssColorFromHex(props.fill_color, "#ef4444");
+        const zoneName = String(props.zone || props.source_zone || "").trim();
+        const filterKey = currentZoneId === "ALL" ? `${zoneName}:${unitType}` : unitType;
+        const legendLabel = currentZoneId === "ALL" && zoneName ? `${zoneName} ${unitType}PY` : `${unitType}PY`;
+
+        entity.name = `${zoneName ? `${zoneName} ` : ""}${props.dong || ""}동 ${props.unit_type || ""}`;
+        entity.fidValue = props.fid;
+        entity.unitType = unitType;
+        entity.filterKey = filterKey;
+        entity.zoneName = zoneName;
+        entity.baseColor = fill;
+        const matchingFootprint = footprints.find(f => String(f.fid) === String(props.fid));
+        entity.positionForSight = matchingFootprint ? {
+          xy: matchingFootprint.center,
+          height: finalHeight
+        } : null;
+        entity.description = buildDescription(props);
+        entity.polygon.height = 0;
+        entity.polygon.extrudedHeight = finalHeight;
+        entity.polygon.material = fill;
+        entity.polygon.outline = false;
+        entity.polygon.shadows = Cesium.ShadowMode.DISABLED;
+        entity.polygon.closeTop = true;
+        entity.polygon.closeBottom = true;
+        addSharpOutlineAndLabel(entity, finalHeight, typeLabel, unitType, filterKey);
+        if (unitType && !legendMap.has(filterKey)) {
+          legendMap.set(filterKey, { filterKey, unitType, zoneName, label: legendLabel, color: cssColor });
+        }
+
+        validCount += 1;
+        maxHeight = Math.max(maxHeight, finalHeight);
+      }
+
+      unitsDataSource = source;
+      await viewer.dataSources.add(source);
+      loadedLegendItems = [...legendMap.values()].sort((a, b) => {
+        const zoneCompare = String(a.label).localeCompare(String(b.label), "ko");
+        const unitCompare = Number.parseFloat(a.unitType) - Number.parseFloat(b.unitType);
+        return currentZoneId === "ALL" ? zoneCompare : unitCompare;
+      });
+      currentFilter = "ALL";
+      buildDefaultLegend();
+      applyUnitFilter(currentFilter);
+      await viewer.zoomTo(source, new Cesium.HeadingPitchRange(
+        Cesium.Math.toRadians(335),
+        Cesium.Math.toRadians(-45),
+        900
+      ));
+
+      const prefix = loadedLabel ? `${loadedLabel} 로드 완료` : "GeoJSON 로드 완료";
+      setStatus(`${prefix}\n유닛 수: ${validCount}\n최대 높이: ${maxHeight.toFixed(1)} m\n${riverStatusText()}`);
+    }
+
+    async function fetchGeoJson(url) {
+      const urls = Array.isArray(url) ? url : [url];
+      const errors = [];
+      for (const candidate of urls) {
+        try {
+          const cacheBustedUrl = `${candidate}${String(candidate).includes("?") ? "&" : "?"}v=${encodeURIComponent(DATA_VERSION)}`;
+          const response = await fetch(cacheBustedUrl, { cache: "no-store" });
+          if (!response.ok) throw new Error(`${candidate}: HTTP ${response.status}`);
+          return response.json();
+        } catch (error) {
+          errors.push(error.message);
+        }
+      }
+      throw new Error(errors.join(" / "));
+    }
+
+    function readStoredIonToken() {
+      const fromUrl = new URLSearchParams(window.location.search).get("ionToken");
+      if (fromUrl && fromUrl.trim()) {
+        localStorage.setItem("apgujeong_cesium_ion_token", fromUrl.trim());
+        return fromUrl.trim();
+      }
+      return localStorage.getItem("apgujeong_cesium_ion_token") || "";
+    }
+
+    function ensureIonTokenForOsm() {
+      const existing = Cesium.Ion.defaultAccessToken || readStoredIonToken();
+      if (existing && existing.trim()) {
+        Cesium.Ion.defaultAccessToken = existing.trim();
+        return true;
+      }
+
+      const token = window.prompt(
+        "Cesium OSM Buildings 표시에는 Cesium ion 토큰이 필요합니다.\n토큰은 이 브라우저 localStorage에만 저장됩니다."
+      );
+      if (!token || !token.trim()) return false;
+      Cesium.Ion.defaultAccessToken = token.trim();
+      localStorage.setItem("apgujeong_cesium_ion_token", token.trim());
+      return true;
+    }
+
+    function positionsFromPolygonFeature(feature) {
+      const ring = feature && feature.geometry && feature.geometry.coordinates && feature.geometry.coordinates[0];
+      if (!ring || ring.length < 4) return null;
+      const flat = [];
+      const cleanRing = ring.slice(0, -1);
+      for (const coord of cleanRing) {
+        flat.push(coord[0], coord[1]);
+      }
+      return Cesium.Cartesian3.fromDegreesArray(flat);
+    }
+
+    async function buildOsmClippingPolygons() {
+      if (!Cesium.ClippingPolygonCollection || !Cesium.ClippingPolygonCollection.isSupported(viewer.scene)) {
+        return null;
+      }
+
+      const maskData = await fetchGeoJson(OSM_CLIP_URL);
+      const polygons = [];
+      for (const feature of maskData.features || []) {
+        const positions = positionsFromPolygonFeature(feature);
+        if (!positions) continue;
+        polygons.push(new Cesium.ClippingPolygon({ positions }));
+      }
+      if (!polygons.length) return null;
+
+      return new Cesium.ClippingPolygonCollection({
+        polygons,
+        inverse: false,
+        quality: 1.0
+      });
+    }
+
+    async function ensureOsmBuildings() {
+      if (osmBuildingsTileset) return osmBuildingsTileset;
+      if (osmBuildingsLoading) return null;
+      if (!ensureIonTokenForOsm()) {
+        setStatus("주변건물 표시가 취소되었습니다. Cesium ion 토큰이 필요합니다.");
+        return null;
+      }
+
+      osmBuildingsLoading = true;
+      setStatus("OSM 주변건물 로드 중...");
+      try {
+        const clippingPolygons = await buildOsmClippingPolygons();
+        const tileset = await Cesium.createOsmBuildingsAsync({
+          style: new Cesium.Cesium3DTileStyle({
+            color: "color('#9ca3af', 0.45)"
+          }),
+          showOutline: false
+        });
+        if (clippingPolygons) {
+          tileset.clippingPolygons = clippingPolygons;
+        }
+        tileset.show = false;
+        viewer.scene.primitives.add(tileset);
+        osmBuildingsTileset = tileset;
+        setStatus(clippingPolygons
+          ? "OSM 주변건물 로드 완료. 압구정 구역 내부 기존건물은 잘라냈습니다."
+          : "OSM 주변건물 로드 완료. 이 브라우저는 clipping polygon을 지원하지 않아 구역 내부 기존건물이 겹칠 수 있습니다.");
+        return tileset;
+      } catch (error) {
+        setStatus(`OSM 주변건물 로드 실패: ${error.message}`);
+        return null;
+      } finally {
+        osmBuildingsLoading = false;
+      }
+    }
+
+    async function toggleOsmBuildings() {
+      const button = document.getElementById("toggleOsmBuildings");
+      const tileset = await ensureOsmBuildings();
+      if (!tileset) return;
+      osmBuildingsVisible = !osmBuildingsVisible;
+      tileset.show = osmBuildingsVisible;
+      if (button) button.textContent = osmBuildingsVisible ? "주변건물 끄기" : "주변건물 켜기";
+      setStatus(osmBuildingsVisible
+        ? "OSM 주변건물을 표시했습니다. 압구정 구역 내부 기존건물은 clipping 마스크로 숨깁니다."
+        : "OSM 주변건물을 숨겼습니다.");
+    }
+
+    function featureIdValue(feature, fallbackIndex) {
+      const props = feature.properties || {};
+      const fid = props.fid;
+      if (fid !== null && fid !== undefined && String(fid).trim() !== "") return fid;
+      return fallbackIndex + 1;
+    }
+
+    function cloneFeatureWithZone(feature, zoneId, fallbackIndex = 0) {
+      const props = { ...(feature.properties || {}) };
+      const sourceFid = featureIdValue(feature, fallbackIndex);
+      props.source_fid = sourceFid;
+      props.source_zone = zoneId;
+      props.fid = `${zoneId}-${sourceFid}`;
+      return {
+        type: "Feature",
+        properties: props,
+        geometry: feature.geometry
+      };
+    }
+
+    function combineFeatureCollections(collections) {
+      return {
+        type: "FeatureCollection",
+        features: collections.flatMap(({ data, zoneId }) =>
+          (data.features || []).map((feature, index) => cloneFeatureWithZone(feature, zoneId, index))
+        )
+      };
+    }
+
+    function combineRiverCollections(collections) {
+      return {
+        type: "FeatureCollection",
+        features: collections.flatMap(({ data }) => data.features || [])
+      };
+    }
+
+    function setActiveZoneButton(zoneId) {
+      for (const button of document.querySelectorAll("[data-zone]")) {
+        button.classList.toggle("active", button.dataset.zone === zoneId);
+      }
+    }
+
+    async function loadZone(zoneId) {
+      const config = ZONE_CONFIGS[zoneId] || ZONE_CONFIGS["2"];
+      currentZoneId = zoneId;
+      setActiveZoneButton(zoneId);
+      setStatus(`${config.label} 데이터를 불러오는 중입니다.`);
+      try {
+        let riverData;
+        let unitsData;
+
+        if (config.zoneIds) {
+          const zoneConfigs = config.zoneIds.map(id => ({ id, ...ZONE_CONFIGS[id] }));
+          const unitCollections = await Promise.all(
+            zoneConfigs.map(async item => ({
+              zoneId: item.id,
+              data: await fetchGeoJson(item.unitsUrl)
+            }))
+          );
+          const uniqueRiverUrls = [...new Set(zoneConfigs.map(item => item.riverUrl))];
+          const riverCollections = await Promise.all(
+            uniqueRiverUrls.map(async url => ({ data: await fetchGeoJson(url) }))
+          );
+          const riverDataByUrl = new Map(riverCollections.map(({ data }, index) => [uniqueRiverUrls[index], data]));
+          riverRawGeoJsonByZone.clear();
+          for (const item of zoneConfigs) {
+            riverRawGeoJsonByZone.set(item.id, riverDataByUrl.get(item.riverUrl));
+          }
+          unitsData = combineFeatureCollections(unitCollections);
+          riverData = combineRiverCollections(riverCollections);
+        } else {
+          const [singleRiverData, singleUnitsData] = await Promise.all([
+            fetchGeoJson(config.riverUrl),
+            fetchGeoJson(config.unitsUrl)
+          ]);
+          riverRawGeoJsonByZone.clear();
+          riverRawGeoJsonByZone.set(zoneId, singleRiverData);
+          unitsData = combineFeatureCollections([{ zoneId, data: singleUnitsData }]);
+          riverData = singleRiverData;
+        }
+
+        riverRawGeoJson = riverData;
+        rebuildRiverContexts();
+        lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
+        drawRiverLines();
+        await loadGeoJson(unitsData, config.label);
+      } catch (error) {
+        setStatus(`${config.label} 로드 실패: ${error.message}`);
+      }
+    }
+
+    function applyVworldBaseMap() {
+      const key = readStoredVworldKey();
+      if (!key) {
+        applyPublicBaseMap("street");
+        return;
+      }
+
+      if (vworldLayer) {
+        viewer.imageryLayers.remove(vworldLayer, true);
+      }
+      if (publicBaseLayer) {
+        viewer.imageryLayers.remove(publicBaseLayer, true);
+        publicBaseLayer = null;
+      }
+
+      const provider = new Cesium.UrlTemplateImageryProvider({
+        url: `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/{z}/{y}/{x}.jpeg`,
+        minimumLevel: 6,
+        maximumLevel: 19,
+        tilingScheme: new Cesium.WebMercatorTilingScheme(),
+        credit: "V-World"
+      });
+
+      vworldLayer = viewer.imageryLayers.addImageryProvider(provider);
+      viewer.imageryLayers.lowerToBottom(vworldLayer);
+      setActiveMapButton("");
+      setStatus("V-World 위성 배경 적용 시도 완료.");
+    }
+
+    const geojsonFileInput = document.getElementById("geojsonFile");
+    if (geojsonFileInput) {
+      geojsonFileInput.addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const data = JSON.parse(text);
+          await loadGeoJson(data);
+        } catch (error) {
+          setStatus(`수동 파일 로드 실패: ${error.message}`);
+        }
+      });
+    }
+
+    const riverFileInput = document.getElementById("riverFile");
+    if (riverFileInput) {
+      riverFileInput.addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          riverRawGeoJson = JSON.parse(text);
+          recalculateViews("수동 한강라인 로드 완료");
+        } catch (error) {
+          setStatus(`한강라인 수동 로드 실패: ${error.message}`);
+        }
+      });
+    }
+
+    const recalculateButton = document.getElementById("recalculateViews");
+    if (recalculateButton) {
+      recalculateButton.addEventListener("click", () => {
+        recalculateViews("조망 계산 갱신 완료");
+      });
+    }
+
+    if (riverExtendInput) {
+      riverExtendInput.addEventListener("change", () => {
+        recalculateViews("한강라인 확장값 반영 완료");
+      });
+    }
+
+    for (const button of document.querySelectorAll("[data-zone]")) {
+      button.addEventListener("click", () => {
+        loadZone(button.dataset.zone);
+      });
+    }
+
+    for (const button of document.querySelectorAll("[data-map]")) {
+      button.addEventListener("click", () => {
+        applyPublicBaseMap(button.dataset.map);
+      });
+    }
+
+    document.getElementById("rotateSelected").addEventListener("click", () => {
+      const center = getSelectedRotateCenter();
+      if (!center) {
+        setStatus("먼저 회전 기준으로 삼을 동/평형 매스를 클릭하세요.");
+        return;
+      }
+      startAutoRotate(center, cameraDistanceTo(center, 520));
+      setStatus("선택 위치 기준 자동회전을 시작했습니다.");
+    });
+
+    document.getElementById("rotateAll").addEventListener("click", () => {
+      startAutoRotate(APGUJEONG_ROTATE_CENTER, 1150);
+      setStatus("전체 배치 기준 자동회전을 시작했습니다.");
+    });
+
+    document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
+
+    const toggleOsmBuildingsButton = document.getElementById("toggleOsmBuildings");
+    if (toggleOsmBuildingsButton) {
+      toggleOsmBuildingsButton.addEventListener("click", toggleOsmBuildings);
+    }
+
+    viewer.selectedEntityChanged.addEventListener((entity) => {
+      drawSelectedSightLines(entity);
+      showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
+    });
+
+    setTimeout(() => applyPublicBaseMap("street"), 300);
+
+    loadZone(currentZoneId);
+  </script>
+</body>
+</html>
