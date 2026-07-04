@@ -418,7 +418,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v36-osm-white-pick-height / OSM 흰색 셰이더 + 클릭 고도 표시</div>
+    <div class="hint">버전: v37-terrain-elevation-osm-outline / 실제 지형 표고 + OSM 외곽선</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -458,7 +458,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v36-osm-white-pick-height-20260704";
+    const DATA_VERSION = "v37-terrain-elevation-osm-outline-20260704";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const OSM_CLIP_URLS = [
@@ -597,6 +597,8 @@
     let osmBuildingsLoading = false;
     let osmBuildingsVisible = false;
     let lastPickedHeightScreenPosition = null;
+    let worldTerrainProvider = null;
+    let worldTerrainProviderPromise = null;
     const viewAnalysisByFid = new Map();
 
     function setStatus(message) {
@@ -2044,25 +2046,67 @@
       return viewer.camera.pickEllipsoid(screenPosition, viewer.scene.globe.ellipsoid);
     }
 
-    function updatePickedHeightDetails(screenPosition) {
+    function pickedHeightFallbackRows(lon, lat, sceneHeight, message) {
+      return `
+        <table class="selection-detail-table">
+          <tbody>
+            <tr><th>경도</th><td>${formatDegrees(lon)}</td></tr>
+            <tr><th>위도</th><td>${formatDegrees(lat)}</td></tr>
+            <tr><th>실제 지형 표고</th><td>${message}</td></tr>
+            <tr><th>장면 표면 높이</th><td>${sceneHeight.toFixed(1)} m</td></tr>
+            <tr><th>기준</th><td>Cesium World Terrain 질의</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    async function updatePickedHeightDetails(screenPosition) {
       if (!selectionDetailTitleEl || !selectionDetailBodyEl) return;
       const cartesian = pickSceneCartesian(screenPosition);
       if (!cartesian) return;
       const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
       const lon = Cesium.Math.toDegrees(cartographic.longitude);
       const lat = Cesium.Math.toDegrees(cartographic.latitude);
-      const height = cartographic.height;
+      const sceneHeight = cartographic.height;
       selectionDetailTitleEl.textContent = "클릭 지점 고도";
       selectionDetailBodyEl.innerHTML = `
         <table class="selection-detail-table">
           <tbody>
             <tr><th>경도</th><td>${formatDegrees(lon)}</td></tr>
             <tr><th>위도</th><td>${formatDegrees(lat)}</td></tr>
-            <tr><th>장면 기준 고도</th><td>${height.toFixed(1)} m</td></tr>
-            <tr><th>기준</th><td>현재 Cesium 장면 표면</td></tr>
+            <tr><th>실제 지형 표고</th><td>조회 중...</td></tr>
+            <tr><th>장면 표면 높이</th><td>${sceneHeight.toFixed(1)} m</td></tr>
+            <tr><th>기준</th><td>Cesium World Terrain 질의</td></tr>
           </tbody>
         </table>
       `;
+
+      try {
+        const terrainProvider = await ensureWorldTerrainProvider();
+        if (!terrainProvider) {
+          selectionDetailBodyEl.innerHTML = pickedHeightFallbackRows(lon, lat, sceneHeight, "토큰 필요");
+          return;
+        }
+        const sampled = await Cesium.sampleTerrainMostDetailed(terrainProvider, [
+          Cesium.Cartographic.fromDegrees(lon, lat)
+        ]);
+        const terrainHeight = sampled && sampled[0] && Number.isFinite(sampled[0].height)
+          ? sampled[0].height
+          : null;
+        selectionDetailBodyEl.innerHTML = pickedHeightFallbackRows(
+          lon,
+          lat,
+          sceneHeight,
+          terrainHeight === null ? "조회 실패" : `${terrainHeight.toFixed(1)} m`
+        );
+      } catch (error) {
+        selectionDetailBodyEl.innerHTML = pickedHeightFallbackRows(
+          lon,
+          lat,
+          sceneHeight,
+          `조회 실패: ${error.message}`
+        );
+      }
     }
 
     function refreshLoadedDescriptions() {
@@ -2222,7 +2266,7 @@
       return localStorage.getItem("apgujeong_cesium_ion_token") || "";
     }
 
-    function ensureIonTokenForOsm() {
+    function ensureIonToken() {
       const existing = Cesium.Ion.defaultAccessToken || readStoredIonToken();
       if (existing && existing.trim()) {
         Cesium.Ion.defaultAccessToken = existing.trim();
@@ -2230,12 +2274,26 @@
       }
 
       const token = window.prompt(
-        "Cesium OSM Buildings 표시에는 Cesium ion 토큰이 필요합니다.\n토큰은 이 브라우저 localStorage에만 저장됩니다."
+        "Cesium OSM Buildings와 World Terrain에는 Cesium ion 토큰이 필요합니다.\n토큰은 이 브라우저 localStorage에만 저장됩니다."
       );
       if (!token || !token.trim()) return false;
       Cesium.Ion.defaultAccessToken = token.trim();
       localStorage.setItem("apgujeong_cesium_ion_token", token.trim());
       return true;
+    }
+
+    function ensureIonTokenForOsm() {
+      return ensureIonToken();
+    }
+
+    async function ensureWorldTerrainProvider() {
+      if (worldTerrainProvider) return worldTerrainProvider;
+      if (!ensureIonToken()) return null;
+      if (!worldTerrainProviderPromise) {
+        worldTerrainProviderPromise = Cesium.createWorldTerrainAsync();
+      }
+      worldTerrainProvider = await worldTerrainProviderPromise;
+      return worldTerrainProvider;
     }
 
     function outerRingsFromBoundaryFeature(feature) {
@@ -2290,9 +2348,10 @@
 
     function applyOsmTilesetAppearance(tileset) {
       tileset.style = new Cesium.Cesium3DTileStyle({
-        color: "color('white', 1.0)"
+        color: "color('#e8edf2', 1.0)"
       });
-      tileset.showOutline = false;
+      tileset.showOutline = true;
+      tileset.outlineColor = Cesium.Color.BLACK;
       if (Cesium.Cesium3DTileColorBlendMode) {
         tileset.colorBlendMode = Cesium.Cesium3DTileColorBlendMode.REPLACE;
       }
@@ -2304,7 +2363,7 @@
           lightingModel: Cesium.LightingModel.UNLIT,
           fragmentShaderText: `
             void fragmentMain(FragmentInput fsInput, inout czm_modelMaterial material) {
-              material.diffuse = vec3(1.0, 1.0, 1.0);
+              material.diffuse = vec3(0.91, 0.93, 0.95);
               material.alpha = 1.0;
             }
           `
@@ -2342,9 +2401,9 @@
         const clippingPolygons = await buildOsmClippingPolygons();
         const tileset = await Cesium.createOsmBuildingsAsync({
           style: new Cesium.Cesium3DTileStyle({
-            color: "color('white', 1.0)"
+            color: "color('#e8edf2', 1.0)"
           }),
-          showOutline: false
+          showOutline: true
         });
         applyOsmTilesetAppearance(tileset);
         applyOsmTilesetHeightOffset(tileset);
