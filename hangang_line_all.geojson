@@ -20,13 +20,22 @@
         "smoothing_note": "Actual riverfront control points are preserved and densified into a smooth LineString approximation.",
         "original_point_count": 5,
         "smoothed_point_count": 73,
-        "extension_note": "Extended approximately 70 meters at the zone-5/eastern end along the final line tangent.",
+        "extension_note": "Both endpoints extended 200m along current endpoint directions from v29 line.",
         "extension_m": 70,
-        "extended_point_count": 74
+        "extended_point_count": 74,
+        "endpoint_extend_m_each": 200,
+        "source_points": 74,
+        "extended_points": 76,
+        "source_length_m": 2613.16,
+        "extended_length_m": 3013.16
       },
       "geometry": {
         "type": "LineString",
         "coordinates": [
+          [
+            127.01623003296741,
+            37.52613471178395
+          ],
           [
             127.01780450255248,
             37.52743558450729
@@ -322,6 +331,10 @@
           [
             127.04293719558764,
             37.53091092448938
+          ],
+          [
+            127.04507087504611,
+            37.53030304015442
           ]
         ]
       }
