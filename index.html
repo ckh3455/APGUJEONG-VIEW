@@ -1406,12 +1406,17 @@
         .find(blocker => blocker.height >= observerHeight && blocker.floors > 0) || null;
     }
 
+    function openCandidatesForFloor(profile, observerHeight) {
+      const candidates = profile.candidates || [profile];
+      return candidates.filter(candidate =>
+        Number(candidate.blockerHeight || 0) < observerHeight
+      );
+    }
+
     function openCandidateForFloor(profile, observerHeight) {
       const candidates = profile.candidates || [profile];
       if (!candidates.length) return null;
-      const openCandidates = candidates.filter(candidate =>
-        Number(candidate.blockerHeight || 0) < observerHeight
-      );
+      const openCandidates = openCandidatesForFloor(profile, observerHeight);
       if ((openCandidates.length / candidates.length) < ANGLE_OPEN_RATIO_THRESHOLD) return null;
       return openCandidates.reduce((best, candidate) =>
         isBetterAngleProfile(candidate, best) ? candidate : best, null);
@@ -1485,8 +1490,9 @@
 
       for (const profile of angleProfiles) {
         potentialAngles.add(profile.angle);
-        const openCandidate = openCandidateForFloor(profile, observerHeight);
-        if (!openCandidate) {
+        const candidates = profile.candidates || [profile];
+        const openCandidates = openCandidatesForFloor(profile, observerHeight);
+        if (!openCandidates.length || (openCandidates.length / candidates.length) < ANGLE_OPEN_RATIO_THRESHOLD) {
           const activeBlocker = blockingBlockerForFloor(profile, observerHeight);
           if (activeBlocker) {
             blockingFloorSet.add(Math.round(activeBlocker.floors));
@@ -1496,23 +1502,26 @@
           continue;
         }
 
-        const ray = {
-          angle: profile.angle,
-          order: profile.angle,
-          distance: openCandidate.distance,
-          origin: openCandidate.origin,
-          end: openCandidate.end
-        };
-        addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays);
+        for (const openCandidate of openCandidates) {
+          const ray = {
+            angle: profile.angle,
+            order: profile.angle,
+            distance: openCandidate.distance,
+            origin: openCandidate.origin,
+            end: openCandidate.end,
+            sample: openCandidate.sample
+          };
+          addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays);
 
-        if (!visibleSamples.has(openCandidate.sample)) {
-          visibleSamples.add(openCandidate.sample);
-          visibleSampleCount += 1;
-          visibleFacadeLength += openCandidate.sample.length;
-          visibleFacadeSegments.push({
-            a: openCandidate.sample.a,
-            b: openCandidate.sample.b
-          });
+          if (!visibleSamples.has(openCandidate.sample)) {
+            visibleSamples.add(openCandidate.sample);
+            visibleSampleCount += 1;
+            visibleFacadeLength += openCandidate.sample.length;
+            visibleFacadeSegments.push({
+              a: openCandidate.sample.a,
+              b: openCandidate.sample.b
+            });
+          }
         }
       }
 
@@ -2087,6 +2096,51 @@
       applyUnitFilter(`ZONE:${zoneName}`);
     }
 
+    function raySampleKey(ray) {
+      const sample = ray && ray.sample;
+      if (!sample) return `angle:${Math.round(Number(ray && ray.angle) || 0)}`;
+      return [
+        sample.segmentIndex,
+        sample.a.x.toFixed(2),
+        sample.a.y.toFixed(2),
+        sample.b.x.toFixed(2),
+        sample.b.y.toFixed(2)
+      ].join(":");
+    }
+
+    function displayRaysForFloorView(floorView, maxSamples = 80) {
+      const rays = floorView && floorView.allOpenRays ? floorView.allOpenRays : [];
+      if (!rays.length) return [];
+
+      const bySample = new Map();
+      for (const ray of rays) {
+        const key = raySampleKey(ray);
+        if (!bySample.has(key)) bySample.set(key, []);
+        bySample.get(key).push(ray);
+      }
+
+      const groups = [...bySample.values()]
+        .sort((a, b) => {
+          const sampleA = a[0] && a[0].sample;
+          const sampleB = b[0] && b[0].sample;
+          const segmentDiff = Number(sampleA && sampleA.segmentIndex || 0) - Number(sampleB && sampleB.segmentIndex || 0);
+          if (segmentDiff !== 0) return segmentDiff;
+          return Number(sampleA && sampleA.a && sampleA.a.x || 0) - Number(sampleB && sampleB.a && sampleB.a.x || 0);
+        });
+
+      const stride = Math.max(1, Math.ceil(groups.length / maxSamples));
+      const selected = [];
+      for (let i = 0; i < groups.length; i += stride) {
+        const group = groups[i].slice().sort((a, b) => a.order - b.order);
+        if (group.length <= 2) {
+          selected.push(...group);
+        } else {
+          selected.push(group[0], group[Math.floor(group.length / 2)], group[group.length - 1]);
+        }
+      }
+      return selected;
+    }
+
     function drawSelectedSightLines(entity, forcedFloor = null) {
       clearSelectedSightLines();
       if (!entity || !entity.fidValue) return;
@@ -2104,7 +2158,7 @@
       const facadeColor = Cesium.Color.fromCssColorString("#16a34a").withAlpha(0.98);
       const rayColor = Cesium.Color.fromCssColorString("#0ea5e9").withAlpha(0.38);
 
-      for (const ray of floorView.allOpenRays || []) {
+      for (const ray of displayRaysForFloorView(floorView)) {
         const origin = xyToLonLat(ray.origin);
         const end = xyToLonLat(ray.end);
         selectedSightEntities.push(viewer.entities.add({
