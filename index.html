@@ -1263,6 +1263,14 @@
       return Number(footprint.floors || 0) + BLOCKER_PENTHOUSE_FLOORS;
     }
 
+    function isSameDongFootprint(a, b) {
+      const zoneA = normalizeZoneId(a && a.zoneName);
+      const zoneB = normalizeZoneId(b && b.zoneName);
+      const dongA = String((a && a.dong) || "").trim();
+      const dongB = String((b && b.dong) || "").trim();
+      return !!dongA && !!dongB && zoneA === zoneB && dongA === dongB;
+    }
+
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
       let internalBlocked = false;
       const hits = [];
@@ -1273,7 +1281,7 @@
           const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
           if (t === null || t <= 2 || t >= maxDistance) continue;
 
-          if (String(footprint.groupKey) === String(sourceFootprint.groupKey)) {
+          if (isSameDongFootprint(footprint, sourceFootprint)) {
             internalBlocked = true;
             continue;
           }
@@ -1413,7 +1421,7 @@
           const targetDistance = distance(sample.point, target);
           if (!rayReachesRiver(sample.point, exactAngle, targetDistance)) continue;
           const blockerProfile = rayBlockerProfile(sample.point, exactAngle, targetDistance, footprint);
-          if (blockerProfile.internalBlocked) continue;
+          if (blockerProfile.internalBlocked && !blockerProfile.blockers.length) continue;
 
           for (const blocker of blockerProfile.blockers) {
             const key = `${blocker.zoneName || ""}:${blocker.dong}동`;
