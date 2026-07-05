@@ -745,6 +745,21 @@
       return Math.min(floor, maxFloor);
     }
 
+    function selectedFloorForEntity(entity, footprint) {
+      if (!footprint) return null;
+      const inputFloor = eyeFloorInputEl ? clampEyeFloor(footprint, eyeFloorInputEl.value) : null;
+      return inputFloor || Math.max(1, Math.round(footprint.floors || 1));
+    }
+
+    function initialHeadingForOpenGap(gap, fallbackHeading) {
+      if (!gap || !gap.start || !Number.isFinite(Number(gap.start.angle))) {
+        return normalizeAngle(fallbackHeading);
+      }
+      const gapSize = Number(gap.size || 0);
+      const insideOffset = Math.min(22, Math.max(6, gapSize * 0.18));
+      return normalizeAngle(Number(gap.start.angle) + insideOffset);
+    }
+
     function updateEyeFloorInput(entity) {
       const footprint = entity && entity.polygon
         ? (entity.footprintForSight || footprints.find(f => String(f.fid) === String(entity.fidValue)))
@@ -776,14 +791,18 @@
 
       if (eyeFloorInputEl) eyeFloorInputEl.value = String(floor);
       const analysis = viewAnalysisByFid.get(String(entity.fidValue));
-      const heading = Number.isFinite(analysis && analysis.riverBearing)
+      const fallbackHeading = Number.isFinite(analysis && analysis.riverBearing)
         ? Number(analysis.riverBearing)
         : Cesium.Math.toDegrees(viewer.camera.heading || Cesium.Math.toRadians(335));
+      const openGap = analysis ? largestGap(analysis.allOpenSummary) : null;
+      const heading = initialHeadingForOpenGap(openGap, fallbackHeading);
       let eyeOrigin = footprint.center;
+      let eyeOffsetHeading = heading;
       if (analysis) {
-        const sightRay = representativeRayForGap(analysis, largestGap(analysis.allOpenSummary));
+        const sightRay = representativeRayForGap(analysis, openGap);
         if (sightRay && sightRay.origin) {
           eyeOrigin = sightRay.origin;
+          eyeOffsetHeading = sightRay.angle;
         } else if (analysis.visibleFacadeSegments && analysis.visibleFacadeSegments.length) {
           const segment = analysis.visibleFacadeSegments[0];
           eyeOrigin = {
@@ -792,7 +811,7 @@
           };
         }
       }
-      const eyePoint = pointAtBearing(eyeOrigin, heading, 18);
+      const eyePoint = pointAtBearing(eyeOrigin, eyeOffsetHeading, 18);
       const lonLat = xyToLonLat(eyePoint);
       const eyeHeight = floorEyeHeight(footprint, floor);
 
@@ -805,6 +824,7 @@
       autoRotateActive = true;
       enable3DControls();
       viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      drawSelectedSightLines(entity, floor);
       viewer.camera.setView({
         destination: autoRotateEyePosition,
         orientation: {
@@ -1847,6 +1867,7 @@
           visibleFacadeSegments: facadeView.visibleFacadeSegments,
           visibleSampleCount: facadeView.visibleSampleCount,
           sampleCount: facadeView.sampleCount,
+          candidateData,
           floorBands,
           displayFloor,
           displayEyeHeight: facadeView.observerHeight,
@@ -2066,20 +2087,45 @@
       applyUnitFilter(`ZONE:${zoneName}`);
     }
 
-    function drawSelectedSightLines(entity) {
+    function drawSelectedSightLines(entity, forcedFloor = null) {
       clearSelectedSightLines();
       if (!entity || !entity.fidValue) return;
       const analysis = viewAnalysisByFid.get(String(entity.fidValue));
-      if (!analysis || !entity.positionForSight) return;
+      const footprint = entity.footprintForSight || selectedFootprintForEyeView();
+      if (!analysis || !analysis.candidateData || !footprint) return;
 
-      const baseHeight = entity.positionForSight.height + 5;
+      const floor = forcedFloor || selectedFloorForEntity(entity, footprint);
+      const baseHeight = floorEyeHeight(footprint, floor) + 1.5;
+      const floorView = summarizeFacadeCandidates(
+        footprint,
+        analysis.candidateData,
+        floorEyeHeight(footprint, floor)
+      );
       const facadeColor = Cesium.Color.fromCssColorString("#16a34a").withAlpha(0.98);
+      const rayColor = Cesium.Color.fromCssColorString("#0ea5e9").withAlpha(0.38);
 
-      for (const segment of analysis.visibleFacadeSegments || []) {
+      for (const ray of floorView.allOpenRays || []) {
+        const origin = xyToLonLat(ray.origin);
+        const end = xyToLonLat(ray.end);
+        selectedSightEntities.push(viewer.entities.add({
+          name: `${entity.name} ${floor}층 조망각`,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+              origin.lon, origin.lat, baseHeight,
+              end.lon, end.lat, baseHeight
+            ]),
+            width: 2,
+            material: rayColor,
+            clampToGround: false
+          }
+        }));
+      }
+
+      for (const segment of floorView.visibleFacadeSegments || []) {
         const a = xyToLonLat(segment.a);
         const b = xyToLonLat(segment.b);
         selectedSightEntities.push(viewer.entities.add({
-          name: `${entity.name} 조망 가능 외곽선`,
+          name: `${entity.name} ${floor}층 조망 가능 외곽선`,
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArrayHeights([
               a.lon, a.lat, baseHeight,
@@ -2854,6 +2900,12 @@
       startEyeRotateButton.addEventListener("click", startEyeLevelRotate);
     }
 
+    if (eyeFloorInputEl) {
+      eyeFloorInputEl.addEventListener("change", () => {
+        if (viewer.selectedEntity) drawSelectedSightLines(viewer.selectedEntity);
+      });
+    }
+
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
 
     const toggleOsmBuildingsButton = document.getElementById("toggleOsmBuildings");
@@ -2874,6 +2926,7 @@
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
     viewer.selectedEntityChanged.addEventListener((entity) => {
+      updateEyeFloorInput(entity);
       drawSelectedSightLines(entity);
       showLegendForSelectedEntity(entity);
       if (!entity && lastPickedHeightScreenPosition) {
@@ -2881,7 +2934,6 @@
       } else {
         updateSelectionDetails(entity);
       }
-      updateEyeFloorInput(entity);
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
