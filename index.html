@@ -597,6 +597,7 @@
     let autoRotatePitch = Cesium.Math.toRadians(-38);
     let autoRotateRange = 900;
     let autoRotateLastMs = 0;
+    let eyeRotateFrameId = null;
     let osmBuildingsTileset = null;
     let osmBuildingsLoading = false;
     let osmBuildingsVisible = false;
@@ -663,6 +664,10 @@
       autoRotateEyePosition = null;
       autoRotateMode = "orbit";
       autoRotateLastMs = 0;
+      if (eyeRotateFrameId !== null) {
+        cancelAnimationFrame(eyeRotateFrameId);
+        eyeRotateFrameId = null;
+      }
       viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       enable3DControls();
       setStatus("회전을 정지했습니다.");
@@ -691,7 +696,31 @@
       autoRotateActive = true;
       autoRotateMode = "orbit";
       autoRotateEyePosition = null;
+      if (eyeRotateFrameId !== null) {
+        cancelAnimationFrame(eyeRotateFrameId);
+        eyeRotateFrameId = null;
+      }
       enable3DControls();
+    }
+
+    function runEyeRotateFrame(now) {
+      if (!autoRotateActive || autoRotateMode !== "eye" || !autoRotateEyePosition) {
+        eyeRotateFrameId = null;
+        return;
+      }
+      const deltaSeconds = autoRotateLastMs ? Math.min((now - autoRotateLastMs) / 1000, 0.1) : 0;
+      autoRotateLastMs = now;
+      autoRotateHeadingDeg = normalizeAngle(autoRotateHeadingDeg + AUTO_ROTATE_SPEED_DEG_PER_SEC * deltaSeconds);
+      viewer.camera.setView({
+        destination: autoRotateEyePosition,
+        orientation: {
+          heading: Cesium.Math.toRadians(autoRotateHeadingDeg),
+          pitch: autoRotatePitch,
+          roll: 0
+        }
+      });
+      if (viewer.scene && viewer.scene.requestRender) viewer.scene.requestRender();
+      eyeRotateFrameId = requestAnimationFrame(runEyeRotateFrame);
     }
 
     function selectedFootprintForEyeView() {
@@ -784,6 +813,8 @@
           roll: 0
         }
       });
+      if (eyeRotateFrameId !== null) cancelAnimationFrame(eyeRotateFrameId);
+      eyeRotateFrameId = requestAnimationFrame(runEyeRotateFrame);
       setStatus(`${entity.name || "선택 유닛"} ${floor}층 눈높이 약 ${Math.round(eyeHeight)}m에서 360도 회전 중입니다.`);
     }
 
