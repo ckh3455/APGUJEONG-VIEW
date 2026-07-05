@@ -474,6 +474,8 @@
     const DATA_VERSION = "v39-formula-total-height-20260705";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
+    const SAME_DONG_CORE_GAP_M = 10;
+    const SAME_DONG_CORE_BRIDGE_STEP_M = 2.5;
     const OSM_CLIP_URLS = [
       "apgujeong_zone_boundaries.geojson",
       "apgujeong_osm_clipping_zones.geojson"
@@ -1005,6 +1007,10 @@
       return distance(point, closestPointOnSegment(point, a, b));
     }
 
+    function segmentLength(segment) {
+      return distance(segment.a, segment.b);
+    }
+
     function valueBetween(value, endA, endB) {
       return value >= Math.min(endA, endB) - 1e-9 && value <= Math.max(endA, endB) + 1e-9;
     }
@@ -1035,6 +1041,24 @@
         pointSegmentDistance(c, a, b),
         pointSegmentDistance(d, a, b)
       );
+    }
+
+    function addCoreBridgeSegment(segments, a, b) {
+      if (distance(a, b) < 0.5 || distance(a, b) > SAME_DONG_CORE_GAP_M) return;
+      const key = segmentKey({ a, b });
+      if (segments.has(key)) return;
+      segments.set(key, { a, b, isCoreBridge: true });
+    }
+
+    function addCoreBridgeSamples(segments, sourceSegment, targetSegment) {
+      const len = segmentLength(sourceSegment);
+      if (!Number.isFinite(len) || len === 0) return;
+      const count = Math.max(1, Math.ceil(len / SAME_DONG_CORE_BRIDGE_STEP_M));
+      for (let i = 0; i <= count; i += 1) {
+        const p = pointAlongSegment(sourceSegment.a, sourceSegment.b, i / count);
+        const q = closestPointOnSegment(p, targetSegment.a, targetSegment.b);
+        addCoreBridgeSegment(segments, p, q);
+      }
     }
 
     function cross(o, a, b) {
@@ -1104,6 +1128,38 @@
       return [...segmentsByKey.entries()]
         .filter(([key]) => counts.get(key) === 1)
         .map(([, segment]) => segment);
+    }
+
+    function exteriorSegmentItemsFromFootprints(groupFootprints) {
+      const counts = new Map();
+      const itemsByKey = new Map();
+      for (const footprint of groupFootprints || []) {
+        for (const segment of footprint.segments || []) {
+          const key = segmentKey(segment);
+          counts.set(key, (counts.get(key) || 0) + 1);
+          if (!itemsByKey.has(key)) itemsByKey.set(key, { segment, footprint });
+        }
+      }
+      return [...itemsByKey.entries()]
+        .filter(([key]) => counts.get(key) === 1)
+        .map(([, item]) => item);
+    }
+
+    function coreBridgeSegmentsFromFootprints(groupFootprints) {
+      const items = exteriorSegmentItemsFromFootprints(groupFootprints);
+      const bridges = new Map();
+      for (let i = 0; i < items.length; i += 1) {
+        for (let j = i + 1; j < items.length; j += 1) {
+          if (items[i].footprint === items[j].footprint) continue;
+          const a = items[i].segment;
+          const b = items[j].segment;
+          const gap = segmentSegmentDistance(a.a, a.b, b.a, b.b);
+          if (gap <= 0.5 || gap > SAME_DONG_CORE_GAP_M) continue;
+          addCoreBridgeSamples(bridges, a, b);
+          addCoreBridgeSamples(bridges, b, a);
+        }
+      }
+      return [...bridges.values()];
     }
 
     function distanceToSegments(point, segments) {
@@ -1276,14 +1332,17 @@
       }
 
       const dongExteriorSegments = new Map();
+      const dongCoreBridgeSegments = new Map();
       for (const [dongKey, groupFootprints] of dongFootprintGroups.entries()) {
         dongExteriorSegments.set(dongKey, exteriorSegmentsFromFootprints(groupFootprints));
+        dongCoreBridgeSegments.set(dongKey, coreBridgeSegmentsFromFootprints(groupFootprints));
       }
 
       for (const footprint of footprints) {
         const group = dongPointGroups.get(footprint.groupKey) || footprint.ring;
         footprint.groupCenter = ringCentroid(group);
         footprint.groupExteriorSegments = dongExteriorSegments.get(footprint.groupKey) || footprint.segments;
+        footprint.groupCoreBridgeSegments = dongCoreBridgeSegments.get(footprint.groupKey) || [];
       }
     }
 
@@ -1400,8 +1459,16 @@
       return !!dongA && !!dongB && zoneA === zoneB && dongA === dongB;
     }
 
+    function rayHitsSameDongCoreBridge(origin, bearing, maxDistance, sourceFootprint) {
+      for (const segment of sourceFootprint.groupCoreBridgeSegments || []) {
+        const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
+        if (t !== null && t > 2 && t < maxDistance) return true;
+      }
+      return false;
+    }
+
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
-      let internalBlocked = false;
+      let internalBlocked = rayHitsSameDongCoreBridge(origin, bearing, maxDistance, sourceFootprint);
       const hits = [];
 
       for (const footprint of footprints) {
