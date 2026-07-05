@@ -474,6 +474,7 @@
     const DATA_VERSION = "v39-formula-total-height-20260705";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
+    const SAME_DONG_CORE_GAP_M = 14;
     const OSM_CLIP_URLS = [
       "apgujeong_zone_boundaries.geojson",
       "apgujeong_osm_clipping_zones.geojson"
@@ -1005,6 +1006,38 @@
       return distance(point, closestPointOnSegment(point, a, b));
     }
 
+    function valueBetween(value, endA, endB) {
+      return value >= Math.min(endA, endB) - 1e-9 && value <= Math.max(endA, endB) + 1e-9;
+    }
+
+    function pointOnSegment(point, a, b) {
+      return Math.abs(cross(a, b, point)) < 1e-9 &&
+        valueBetween(point.x, a.x, b.x) &&
+        valueBetween(point.y, a.y, b.y);
+    }
+
+    function segmentsIntersect(a, b, c, d) {
+      const abC = cross(a, b, c);
+      const abD = cross(a, b, d);
+      const cdA = cross(c, d, a);
+      const cdB = cross(c, d, b);
+      if (Math.abs(abC) < 1e-9 && pointOnSegment(c, a, b)) return true;
+      if (Math.abs(abD) < 1e-9 && pointOnSegment(d, a, b)) return true;
+      if (Math.abs(cdA) < 1e-9 && pointOnSegment(a, c, d)) return true;
+      if (Math.abs(cdB) < 1e-9 && pointOnSegment(b, c, d)) return true;
+      return abC * abD < 0 && cdA * cdB < 0;
+    }
+
+    function segmentSegmentDistance(a, b, c, d) {
+      if (segmentsIntersect(a, b, c, d)) return 0;
+      return Math.min(
+        pointSegmentDistance(a, c, d),
+        pointSegmentDistance(b, c, d),
+        pointSegmentDistance(c, a, b),
+        pointSegmentDistance(d, a, b)
+      );
+    }
+
     function cross(o, a, b) {
       return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
     }
@@ -1371,17 +1404,21 @@
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
       let internalBlocked = false;
       const hits = [];
+      const rayEnd = pointAtBearing(origin, bearing, maxDistance);
 
       for (const footprint of footprints) {
         if (String(footprint.fid) === String(sourceFootprint.fid)) continue;
         for (const segment of footprint.segments) {
           const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
-          if (t === null || t <= 2 || t >= maxDistance) continue;
-
           if (isSameDongFootprint(footprint, sourceFootprint)) {
-            internalBlocked = true;
+            if ((t !== null && t > 2 && t < maxDistance) ||
+              segmentSegmentDistance(origin, rayEnd, segment.a, segment.b) <= SAME_DONG_CORE_GAP_M) {
+              internalBlocked = true;
+            }
             continue;
           }
+
+          if (t === null || t <= 2 || t >= maxDistance) continue;
 
           hits.push({
             zoneName: footprint.zoneName,
@@ -2401,15 +2438,13 @@
 
     function buildDescription(props) {
       const analysis = viewAnalysisByFid.get(String(props.fid));
-      const floorCauseHtml = analysis ? formatFloorTransitionCauses(analysis) : "";
       const rows = [
         ["구역", escapeHtml(props.zone || props.source_zone || "")],
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(normalizedFloorCount(props))],
         ["최고층 조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
-        ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"],
-        ["층별 변화 원인", floorCauseHtml || "변화 원인 없음"]
+        ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
       ];
       return `
         <table class="selection-detail-table">
