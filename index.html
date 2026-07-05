@@ -474,7 +474,6 @@
     const DATA_VERSION = "v39-formula-total-height-20260705";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
-    const SAME_DONG_CORE_GAP_M = 10;
     const OSM_CLIP_URLS = [
       "apgujeong_zone_boundaries.geojson",
       "apgujeong_osm_clipping_zones.geojson"
@@ -1099,28 +1098,12 @@
         for (const segment of footprint.segments || []) {
           const key = segmentKey(segment);
           counts.set(key, (counts.get(key) || 0) + 1);
-          if (!segmentsByKey.has(key)) segmentsByKey.set(key, { segment, footprint });
+          if (!segmentsByKey.has(key)) segmentsByKey.set(key, segment);
         }
       }
       return [...segmentsByKey.entries()]
-        .filter(([key, item]) => {
-          if (counts.get(key) !== 1) return false;
-          for (const otherFootprint of groupFootprints || []) {
-            if (otherFootprint === item.footprint) continue;
-            for (const otherSegment of otherFootprint.segments || []) {
-              if (segmentSegmentDistance(
-                item.segment.a,
-                item.segment.b,
-                otherSegment.a,
-                otherSegment.b
-              ) <= SAME_DONG_CORE_GAP_M) {
-                return false;
-              }
-            }
-          }
-          return true;
-        })
-        .map(([, item]) => item.segment);
+        .filter(([key]) => counts.get(key) === 1)
+        .map(([, segment]) => segment);
     }
 
     function distanceToSegments(point, segments) {
@@ -1420,15 +1403,13 @@
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
       let internalBlocked = false;
       const hits = [];
-      const rayEnd = pointAtBearing(origin, bearing, maxDistance);
 
       for (const footprint of footprints) {
         if (String(footprint.fid) === String(sourceFootprint.fid)) continue;
         for (const segment of footprint.segments) {
           const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
           if (isSameDongFootprint(footprint, sourceFootprint)) {
-            if ((t !== null && t > 2 && t < maxDistance) ||
-              segmentSegmentDistance(origin, rayEnd, segment.a, segment.b) <= SAME_DONG_CORE_GAP_M) {
+            if (t !== null && t > 2 && t < maxDistance) {
               internalBlocked = true;
             }
             continue;
