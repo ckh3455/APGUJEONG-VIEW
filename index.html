@@ -79,6 +79,7 @@
       flex-wrap: wrap;
       gap: 5px;
       margin-top: 6px;
+      align-items: center;
     }
     .zone-tabs,
     .map-tabs {
@@ -98,6 +99,18 @@
     .buttons button {
       min-height: 28px;
       font-size: 11px;
+    }
+    .floor-total-angle {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.08);
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
     }
     .osm-note {
       margin-top: 5px;
@@ -433,11 +446,11 @@
     </div>
     <div class="buttons">
       <input id="eyeFloorInput" type="number" min="1" step="1" inputmode="numeric" placeholder="층수" style="width:78px; padding:5px 7px; font-size:11px;" />
+      <span id="floorTotalAngle" class="floor-total-angle">유닛 선택</span>
       <button id="startEyeRotate" class="secondary">눈높이 360도</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
-      <button id="toggleOsmBuildings" class="secondary">주변건물 켜기(토큰)</button>
     </div>
-    <div class="osm-note">처음 화면은 기존과 같습니다. `주변건물 켜기(토큰)`을 누르면 흰색 불투명 OSM 기존건물이 표시되고, QGIS 구역경계가 있으면 그 경계로 내부를 잘라냅니다.</div>
+    <div class="osm-note">흰색 불투명 OSM 기존건물은 자동 표시되고, QGIS 구역경계가 있으면 그 경계로 내부를 잘라냅니다.</div>
     <div class="legend-detail-wrap">
       <div class="legend-section">
         <label>평형 범례</label>
@@ -516,6 +529,7 @@
     const selectionDetailBodyEl = document.getElementById("selectionDetailBody");
     const eyeFloorInputEl = document.getElementById("eyeFloorInput");
     const startEyeRotateButton = document.getElementById("startEyeRotate");
+    const floorTotalAngleEl = document.getElementById("floorTotalAngle");
     const riverExtendInput = document.getElementById("riverExtendMeters");
     const PUBLIC_VWORLD_KEY = "";
     const VWORLD_KEY_STORAGE = "apgujeong_vworld_key";
@@ -751,6 +765,38 @@
       return inputFloor || Math.max(1, Math.round(footprint.floors || 1));
     }
 
+    function floorViewForEntity(entity, forcedFloor = null) {
+      const footprint = entity && entity.polygon
+        ? (entity.footprintForSight || footprints.find(f => String(f.fid) === String(entity.fidValue)))
+        : null;
+      if (!entity || !footprint || !entity.fidValue) return null;
+      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
+      if (!analysis || !analysis.candidateData) return null;
+      const floor = forcedFloor || selectedFloorForEntity(entity, footprint);
+      if (!floor) return null;
+      const observerHeight = floorEyeHeight(footprint, floor);
+      return {
+        floor,
+        footprint,
+        analysis,
+        view: summarizeFacadeCandidates(footprint, analysis.candidateData, observerHeight)
+      };
+    }
+
+    function updateFloorTotalAngle(entity = viewer.selectedEntity) {
+      if (!floorTotalAngleEl) return;
+      const data = floorViewForEntity(entity);
+      if (!data) {
+        floorTotalAngleEl.textContent = "유닛 선택";
+        return;
+      }
+      const props = propsFromEntity(entity);
+      const dong = formatDong(props.dong).replace(/<[^>]*>/g, "");
+      const unitType = String(props.unit_type || "").trim();
+      const unitLabel = unitType ? ` ${unitType}PY` : "";
+      floorTotalAngleEl.textContent = `${dong}${unitLabel} ${data.floor}층 총 ${Math.round(data.view.totalOpen)}도`;
+    }
+
     function initialHeadingForOpenGap(gap, fallbackHeading) {
       if (!gap || !gap.start || !Number.isFinite(Number(gap.start.angle))) {
         return normalizeAngle(fallbackHeading);
@@ -768,11 +814,13 @@
       if (!footprint) {
         eyeFloorInputEl.value = "";
         eyeFloorInputEl.removeAttribute("max");
+        updateFloorTotalAngle(null);
         return;
       }
       const maxFloor = Math.max(1, Math.round(footprint.floors || 1));
       eyeFloorInputEl.max = String(maxFloor);
       eyeFloorInputEl.value = String(clampEyeFloor(footprint, eyeFloorInputEl.value) || maxFloor);
+      updateFloorTotalAngle(entity);
     }
 
     function startEyeLevelRotate() {
@@ -791,20 +839,21 @@
 
       if (eyeFloorInputEl) eyeFloorInputEl.value = String(floor);
       const analysis = viewAnalysisByFid.get(String(entity.fidValue));
+      const floorData = floorViewForEntity(entity, floor);
       const fallbackHeading = Number.isFinite(analysis && analysis.riverBearing)
         ? Number(analysis.riverBearing)
         : Cesium.Math.toDegrees(viewer.camera.heading || Cesium.Math.toRadians(335));
-      const openGap = analysis ? largestGap(analysis.allOpenSummary) : null;
+      const openGap = floorData ? largestGap(floorData.view.allOpenSummary) : null;
       const heading = initialHeadingForOpenGap(openGap, fallbackHeading);
       let eyeOrigin = footprint.center;
       let eyeOffsetHeading = heading;
-      if (analysis) {
-        const sightRay = representativeRayForGap(analysis, openGap);
+      if (floorData) {
+        const sightRay = representativeRayForGap({ allOpenRays: floorData.view.allOpenRays }, openGap);
         if (sightRay && sightRay.origin) {
           eyeOrigin = sightRay.origin;
           eyeOffsetHeading = sightRay.angle;
-        } else if (analysis.visibleFacadeSegments && analysis.visibleFacadeSegments.length) {
-          const segment = analysis.visibleFacadeSegments[0];
+        } else if (floorData.view.visibleFacadeSegments && floorData.view.visibleFacadeSegments.length) {
+          const segment = floorData.view.visibleFacadeSegments[0];
           eyeOrigin = {
             x: (segment.a.x + segment.b.x) / 2,
             y: (segment.a.y + segment.b.y) / 2
@@ -825,6 +874,7 @@
       enable3DControls();
       viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       drawSelectedSightLines(entity, floor);
+      updateFloorTotalAngle(entity);
       viewer.camera.setView({
         destination: autoRotateEyePosition,
         orientation: {
@@ -2171,17 +2221,12 @@
     function drawSelectedSightLines(entity, forcedFloor = null) {
       clearSelectedSightLines();
       if (!entity || !entity.fidValue) return;
-      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
-      const footprint = entity.footprintForSight || selectedFootprintForEyeView();
-      if (!analysis || !analysis.candidateData || !footprint) return;
+      const data = floorViewForEntity(entity, forcedFloor);
+      if (!data) return;
 
-      const floor = forcedFloor || selectedFloorForEntity(entity, footprint);
-      const baseHeight = floorEyeHeight(footprint, floor) + 1.5;
-      const floorView = summarizeFacadeCandidates(
-        footprint,
-        analysis.candidateData,
-        floorEyeHeight(footprint, floor)
-      );
+      const floor = data.floor;
+      const baseHeight = floorEyeHeight(data.footprint, floor) + 1.5;
+      const floorView = data.view;
       const facadeColor = Cesium.Color.fromCssColorString("#16a34a").withAlpha(0.98);
       const rayColor = Cesium.Color.fromCssColorString("#0ea5e9").withAlpha(0.38);
 
@@ -2515,6 +2560,7 @@
         drawSelectedSightLines(viewer.selectedEntity);
         updateSelectionDetails(viewer.selectedEntity);
       }
+      updateFloorTotalAngle(viewer.selectedEntity);
     }
 
     async function loadGeoJson(input, loadedLabel = "") {
@@ -2524,6 +2570,8 @@
       }
       viewer.selectedEntity = undefined;
       updateSelectionDetails(null);
+      updateEyeFloorInput(null);
+      updateFloorTotalAngle(null);
       clearOutlines();
       clearSelectedSightLines();
       prepareFootprints(input);
@@ -2790,16 +2838,12 @@
       }
     }
 
-    async function toggleOsmBuildings() {
-      const button = document.getElementById("toggleOsmBuildings");
+    async function showOsmBuildings() {
       const tileset = await ensureOsmBuildings();
       if (!tileset) return;
-      osmBuildingsVisible = !osmBuildingsVisible;
-      tileset.show = osmBuildingsVisible;
-      if (button) button.textContent = osmBuildingsVisible ? "주변건물 끄기" : "주변건물 켜기";
-      setStatus(osmBuildingsVisible
-        ? "OSM 주변건물을 표시했습니다. 압구정 구역 내부 기존건물은 clipping 마스크로 숨깁니다."
-        : "OSM 주변건물을 숨겼습니다.");
+      osmBuildingsVisible = true;
+      tileset.show = true;
+      setStatus("OSM 주변건물을 표시했습니다. 압구정 구역 내부 기존건물은 clipping 마스크로 숨깁니다.");
     }
 
     function featureIdValue(feature, fallbackIndex) {
@@ -2982,17 +3026,15 @@
     }
 
     if (eyeFloorInputEl) {
-      eyeFloorInputEl.addEventListener("change", () => {
+      const handleFloorInput = () => {
         if (viewer.selectedEntity) drawSelectedSightLines(viewer.selectedEntity);
-      });
+        updateFloorTotalAngle(viewer.selectedEntity);
+      };
+      eyeFloorInputEl.addEventListener("input", handleFloorInput);
+      eyeFloorInputEl.addEventListener("change", handleFloorInput);
     }
 
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
-
-    const toggleOsmBuildingsButton = document.getElementById("toggleOsmBuildings");
-    if (toggleOsmBuildingsButton) {
-      toggleOsmBuildingsButton.addEventListener("click", toggleOsmBuildings);
-    }
 
     const pickHeightHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     pickHeightHandler.setInputAction((movement) => {
@@ -3018,6 +3060,7 @@
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
+    setTimeout(() => showOsmBuildings(), 900);
 
     loadZone(currentZoneId);
   </script>
