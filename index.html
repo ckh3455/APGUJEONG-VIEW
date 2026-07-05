@@ -474,7 +474,7 @@
     const DATA_VERSION = "v39-formula-total-height-20260705";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
-    const SAME_DONG_CORE_GAP_M = 14;
+    const SAME_DONG_CORE_GAP_M = 10;
     const OSM_CLIP_URLS = [
       "apgujeong_zone_boundaries.geojson",
       "apgujeong_osm_clipping_zones.geojson"
@@ -1099,12 +1099,28 @@
         for (const segment of footprint.segments || []) {
           const key = segmentKey(segment);
           counts.set(key, (counts.get(key) || 0) + 1);
-          if (!segmentsByKey.has(key)) segmentsByKey.set(key, segment);
+          if (!segmentsByKey.has(key)) segmentsByKey.set(key, { segment, footprint });
         }
       }
       return [...segmentsByKey.entries()]
-        .filter(([key]) => counts.get(key) === 1)
-        .map(([, segment]) => segment);
+        .filter(([key, item]) => {
+          if (counts.get(key) !== 1) return false;
+          for (const otherFootprint of groupFootprints || []) {
+            if (otherFootprint === item.footprint) continue;
+            for (const otherSegment of otherFootprint.segments || []) {
+              if (segmentSegmentDistance(
+                item.segment.a,
+                item.segment.b,
+                otherSegment.a,
+                otherSegment.b
+              ) <= SAME_DONG_CORE_GAP_M) {
+                return false;
+              }
+            }
+          }
+          return true;
+        })
+        .map(([, item]) => item.segment);
     }
 
     function distanceToSegments(point, segments) {
