@@ -418,7 +418,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v37-terrain-elevation-osm-outline / 실제 지형 표고 + OSM 외곽선</div>
+    <div class="hint">버전: v39-formula-total-height / 총높이=층수×층고+필로티 고정</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -458,7 +458,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v37-terrain-elevation-osm-outline-20260704";
+    const DATA_VERSION = "v39-formula-total-height-20260705";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const OSM_CLIP_URLS = [
@@ -1373,6 +1373,62 @@
       };
     }
 
+    function blockerCauseKey(blocker, angle) {
+      return [
+        blocker.zoneName || "",
+        blocker.dong || "",
+        blocker.unitType || "",
+        Math.round(Number(blocker.height || 0) * 10) / 10,
+        Math.round(Number(blocker.distance || 0)),
+        angle
+      ].join(":");
+    }
+
+    function explainFloorTransition(candidateData, previousSummary, nextSummary, transitionFloor) {
+      if (!candidateData || !previousSummary || !nextSummary) return null;
+      const previousOpenAngles = new Set((previousSummary.allOpenRays || []).map(ray => ray.angle));
+      const nextOpenAngles = new Set((nextSummary.allOpenRays || []).map(ray => ray.angle));
+      const causes = [];
+      const seen = new Set();
+
+      for (const profile of candidateData.angleProfiles || []) {
+        if (previousOpenAngles.has(profile.angle) || !nextOpenAngles.has(profile.angle)) continue;
+        const blocker = blockingBlockerForFloor(profile, previousSummary.observerHeight);
+        if (!blocker) continue;
+        const key = blockerCauseKey(blocker, profile.angle);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        causes.push({
+          ...blocker,
+          angle: profile.angle
+        });
+      }
+
+      if (!causes.length && previousSummary.blockingBlockers && previousSummary.blockingBlockers.length) {
+        for (const blocker of previousSummary.blockingBlockers.slice(0, 3)) {
+          const key = blockerCauseKey(blocker, "");
+          if (seen.has(key)) continue;
+          seen.add(key);
+          causes.push({ ...blocker, angle: null });
+        }
+      }
+
+      if (!causes.length) return null;
+      causes.sort((a, b) => {
+        const heightDiff = Number(a.height || 0) - Number(b.height || 0);
+        if (heightDiff !== 0) return heightDiff;
+        return Number(a.distance || 0) - Number(b.distance || 0);
+      });
+
+      return {
+        floor: transitionFloor,
+        fromAngle: previousSummary.totalOpen,
+        toAngle: nextSummary.totalOpen,
+        observerHeight: nextSummary.observerHeight,
+        blockers: causes.slice(0, 3)
+      };
+    }
+
     function buildFloorBands(footprint, candidateData) {
       const floorCount = Math.max(1, Math.round(footprint.floors || 1));
       const bands = [];
@@ -1395,7 +1451,13 @@
           previous.end = floor;
         } else {
           bands.push(previous);
-          previous = { start: floor, end: floor, comparable, summary };
+          previous = {
+            start: floor,
+            end: floor,
+            comparable,
+            summary,
+            transitionCause: explainFloorTransition(candidateData, previous.summary, summary, floor)
+          };
         }
       }
 
@@ -1565,9 +1627,8 @@
       const zoneId = normalizeZoneId(props.zone || props.source_zone || "");
       if (zoneId === "2" || zoneId === "3") return 3.692;
       const floors = normalizedFloorCount(props);
-      const piloti = Number(props.piloti_m || 0);
       const height = Number(props.height_m || props.height || 0);
-      if (floors > 0 && height > piloti) return (height - piloti) / floors;
+      if (floors > 0 && height > 0) return height / floors;
       return 3.692;
     }
 
@@ -1576,23 +1637,13 @@
       const floorH = normalizedFloorHeight(props);
       const piloti = Number(props.piloti_m || 0);
       const height = Number(props.height_m || props.height || 0);
-      const bodyHeight = floors > 0 && floorH > 0 ? floors * floorH : 0;
-      const expectedTotal = bodyHeight + piloti;
-      const tolerance = 0.25;
-
-      if (!Number.isFinite(height) || height <= 0) {
-        return expectedTotal > 0 ? expectedTotal : 20;
+      if (floors > 0 && floorH > 0) {
+        return floors * floorH + piloti;
       }
-      if (bodyHeight > 0 && Math.abs(height - bodyHeight) <= tolerance) {
+      if (Number.isFinite(height) && height > 0) {
         return height + piloti;
       }
-      if (expectedTotal > 0 && Math.abs(height - expectedTotal) <= tolerance) {
-        return height;
-      }
-      if (piloti > 0 && bodyHeight > 0 && height < expectedTotal - piloti * 0.45) {
-        return height + piloti;
-      }
-      return height;
+      return 20;
     }
 
     function riverContextForFootprint(footprint) {
@@ -1972,6 +2023,38 @@
       return `<span style="display:inline-block; margin-right:10px; color:${floorBandColor(index)}; font-weight:800; white-space:nowrap;">${escapeHtml(label)} ${Math.round(riverAngle)}도</span>`;
     }
 
+    function formatBlockerCauseName(blocker) {
+      const parts = [];
+      if (blocker.zoneName) parts.push(escapeHtml(blocker.zoneName));
+      if (blocker.dong) parts.push(formatDong(blocker.dong));
+      if (blocker.unitType) parts.push(formatUnitType(blocker.unitType));
+      return parts.join(" ") || "차폐 후보";
+    }
+
+    function formatFloorTransitionCause(cause, index) {
+      if (!cause || !cause.blockers || !cause.blockers.length) return "";
+      const color = floorBandColor(index);
+      const blockers = cause.blockers.map(blocker => {
+        const height = Number(blocker.height || 0);
+        const distanceText = Number.isFinite(Number(blocker.distance))
+          ? `${Math.round(Number(blocker.distance))}m`
+          : "";
+        const angleText = blocker.angle === null || blocker.angle === undefined
+          ? ""
+          : ` / ${Math.round(blocker.angle)}도 방향`;
+        return `${formatBlockerCauseName(blocker)} / 높이 ${height.toFixed(1)}m / 거리 ${distanceText}${angleText}`;
+      }).join("<br>");
+      return `<div style="margin-bottom:4px;"><span style="color:${color}; font-weight:800;">${cause.floor}층부터 ${Math.round(cause.fromAngle)}도 → ${Math.round(cause.toAngle)}도</span><br>${blockers}</div>`;
+    }
+
+    function formatFloorTransitionCauses(analysis) {
+      if (!analysis || !analysis.floorBands || analysis.floorBands.length <= 1) return "";
+      return analysis.floorBands
+        .map((band, index) => formatFloorTransitionCause(band.transitionCause, index))
+        .filter(Boolean)
+        .join("");
+    }
+
     function formatFloorBands(analysis) {
       if (!analysis || !analysis.floorBands || !analysis.floorBands.length) return "계산 전";
       const floorCount = analysis.displayFloor;
@@ -1994,13 +2077,15 @@
 
     function buildDescription(props) {
       const analysis = viewAnalysisByFid.get(String(props.fid));
+      const floorCauseHtml = analysis ? formatFloorTransitionCauses(analysis) : "";
       const rows = [
         ["구역", escapeHtml(props.zone || props.source_zone || "")],
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
         ["최고층", formatFloorCount(normalizedFloorCount(props))],
         ["최고층 조망각", analysis ? `${analysis.totalOpen}도` : "계산 전"],
-        ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"]
+        ["층별 변화", analysis ? formatFloorBands(analysis) : "계산 전"],
+        ["층별 변화 원인", floorCauseHtml || "변화 원인 없음"]
       ];
       return `
         <table class="selection-detail-table">
