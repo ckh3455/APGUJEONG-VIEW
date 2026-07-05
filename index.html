@@ -999,6 +999,31 @@
       return segments;
     }
 
+    function pointKey(point) {
+      return `${point.x.toFixed(3)},${point.y.toFixed(3)}`;
+    }
+
+    function segmentKey(segment) {
+      const a = pointKey(segment.a);
+      const b = pointKey(segment.b);
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    }
+
+    function exteriorSegmentsFromFootprints(groupFootprints) {
+      const counts = new Map();
+      const segmentsByKey = new Map();
+      for (const footprint of groupFootprints || []) {
+        for (const segment of footprint.segments || []) {
+          const key = segmentKey(segment);
+          counts.set(key, (counts.get(key) || 0) + 1);
+          if (!segmentsByKey.has(key)) segmentsByKey.set(key, segment);
+        }
+      }
+      return [...segmentsByKey.entries()]
+        .filter(([key]) => counts.get(key) === 1)
+        .map(([, segment]) => segment);
+    }
+
     function distanceToSegments(point, segments) {
       let best = Number.POSITIVE_INFINITY;
       for (const segment of segments || []) {
@@ -1129,6 +1154,7 @@
       footprints = [];
       if (!geojson || !geojson.features) return;
       const dongPointGroups = new Map();
+      const dongFootprintGroups = new Map();
       for (const feature of geojson.features) {
         const geometry = feature.geometry;
         const props = feature.properties || {};
@@ -1162,19 +1188,20 @@
           const dongKey = footprint.groupKey;
           if (!dongPointGroups.has(dongKey)) dongPointGroups.set(dongKey, []);
           dongPointGroups.get(dongKey).push(...ring);
+          if (!dongFootprintGroups.has(dongKey)) dongFootprintGroups.set(dongKey, []);
+          dongFootprintGroups.get(dongKey).push(footprint);
         }
       }
 
-      const dongHullSegments = new Map();
-      for (const [dongKey, points] of dongPointGroups.entries()) {
-        const hull = convexHull(points);
-        dongHullSegments.set(dongKey, segmentsFromPoints(hull));
+      const dongExteriorSegments = new Map();
+      for (const [dongKey, groupFootprints] of dongFootprintGroups.entries()) {
+        dongExteriorSegments.set(dongKey, exteriorSegmentsFromFootprints(groupFootprints));
       }
 
       for (const footprint of footprints) {
         const group = dongPointGroups.get(footprint.groupKey) || footprint.ring;
         footprint.groupCenter = ringCentroid(group);
-        footprint.groupHullSegments = dongHullSegments.get(footprint.groupKey) || footprint.segments;
+        footprint.groupExteriorSegments = dongExteriorSegments.get(footprint.groupKey) || footprint.segments;
       }
     }
 
@@ -1351,7 +1378,7 @@
       };
       if (pointInRing(testPoint, footprint.ring)) return false;
 
-      return distanceToSegments(samplePoint, footprint.groupHullSegments) <= EXTERIOR_HULL_TOLERANCE_M;
+      return distanceToSegments(samplePoint, footprint.groupExteriorSegments) <= EXTERIOR_HULL_TOLERANCE_M;
     }
 
     function addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays) {
@@ -1446,7 +1473,7 @@
           const targetDistance = distance(sample.point, target);
           if (!rayReachesRiver(sample.point, exactAngle, targetDistance)) continue;
           const blockerProfile = rayBlockerProfile(sample.point, exactAngle, targetDistance, footprint);
-          if (blockerProfile.internalBlocked && !blockerProfile.blockers.length) continue;
+          if (blockerProfile.internalBlocked) continue;
 
           for (const blocker of blockerProfile.blockers) {
             const key = `${blocker.zoneName || ""}:${blocker.dong}동`;
