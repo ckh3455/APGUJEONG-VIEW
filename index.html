@@ -431,7 +431,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v39-formula-total-height / 총높이=층수×층고+필로티 고정</div>
+    <div class="hint">버전: v40-lazy-zone-analysis / 유닛 클릭 시 구역별 조망 계산</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -450,7 +450,8 @@
       <button id="startEyeRotate" class="secondary">눈높이 360도</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
     </div>
-    <div class="osm-note">흰색 불투명 OSM 기존건물은 자동 표시되고, QGIS 구역경계가 있으면 그 경계로 내부를 잘라냅니다.</div>
+    <div class="osm-note">흰색 불투명 OSM 기존건물은 필요 시 수동으로 표시하고, QGIS 구역경계가 있으면 그 경계로 내부를 잘라냅니다.</div>
+    <div id="status" class="status" hidden></div>
     <div class="legend-detail-wrap">
       <div class="legend-section">
         <label>평형 범례</label>
@@ -471,7 +472,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v39-formula-total-height-20260705";
+    const DATA_VERSION = "v40-lazy-zone-analysis-20260706";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -621,6 +622,9 @@
     let worldTerrainProvider = null;
     let worldTerrainProviderPromise = null;
     const viewAnalysisByFid = new Map();
+    const calculatedZones = new Set();
+    const calculatingZonePromises = new Map();
+    let zoneCalculationQueue = Promise.resolve();
 
     function setStatus(message) {
       if (!statusEl) return;
@@ -2015,56 +2019,133 @@
       };
     }
 
-    function analyzeViews() {
+    function zoneIdFromProps(props) {
+      return normalizeZoneId((props && (props.zone || props.source_zone)) || "");
+    }
+
+    function zoneIdFromEntity(entity) {
+      if (!entity) return "";
+      const props = entity.polygon ? propsFromEntity(entity) : {};
+      return normalizeZoneId(props.zone || props.source_zone || entity.zoneName || "");
+    }
+
+    function resetViewAnalysisCache() {
       viewAnalysisByFid.clear();
+      calculatedZones.clear();
+      calculatingZonePromises.clear();
+      zoneCalculationQueue = Promise.resolve();
+    }
+
+    function zoneLabelForStatus(zoneId) {
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      if (!normalizedZoneId || normalizedZoneId === "ALL") return "전체";
+      return `${normalizedZoneId}구역`;
+    }
+
+    function targetFootprintsForZone(zoneId) {
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      if (!normalizedZoneId || normalizedZoneId === "ALL") return footprints.slice();
+      return footprints.filter(footprint => normalizeZoneId(footprint.zoneName) === normalizedZoneId);
+    }
+
+    function storeViewAnalysisForFootprint(footprint) {
+      const riverContext = riverContextForFootprint(footprint);
+      if (!riverContext || !riverContext.segments.length || !riverContext.points.length) return false;
+
+      activeRiverSegments = riverContext.segments;
+      activeRiverPoints = riverContext.points;
+      const closest = closestPointOnPolyline(footprint.center, activeRiverSegments);
+      const direction = closest ? bearingTo(footprint.center, closest.point) : null;
+      const candidateData = collectFacadeCandidates(footprint);
+      const floorBands = buildFloorBands(footprint, candidateData);
+      const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
+      const facadeView = summarizeFacadeCandidates(
+        footprint,
+        candidateData,
+        floorEyeHeight(footprint, displayFloor)
+      );
+      const totalOpen = facadeView.totalOpen;
+      const grade = totalOpen >= 60 ? "전면 조망" :
+        totalOpen >= 30 ? "양호한 부분 조망" :
+        totalOpen >= 10 ? "틈새 조망" :
+        facadeView.visibleFacadeLength > 0 ? "제한적 조망" : "차폐";
+
+      viewAnalysisByFid.set(String(footprint.fid), {
+        riverDistance: closest ? closest.distance : null,
+        riverBearing: direction,
+        riverBearingName: direction === null ? "" : bearingName(direction),
+        targetSpan: facadeView.targetSpan,
+        openByDirection: facadeView.openByDirection,
+        openRaysByDirection: facadeView.openRaysByDirection,
+        allOpenSummary: facadeView.allOpenSummary,
+        allOpenRays: facadeView.allOpenRays,
+        totalOpen,
+        visibleFacadeLength: facadeView.visibleFacadeLength,
+        visibleFacadeSegments: facadeView.visibleFacadeSegments,
+        visibleSampleCount: facadeView.visibleSampleCount,
+        sampleCount: facadeView.sampleCount,
+        candidateData,
+        floorBands,
+        displayFloor,
+        displayEyeHeight: facadeView.observerHeight,
+        blockers: facadeView.blockers.slice(0, 3),
+        grade
+      });
+      return true;
+    }
+
+    async function runZoneAnalysis(zoneId, options = {}) {
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      const cacheKey = normalizedZoneId || "ALL";
+      const force = !!options.force;
+      if (!force && calculatedZones.has(cacheKey)) return;
       if (!riverSegments.length || !footprints.length) return;
 
-      for (const footprint of footprints) {
-        const riverContext = riverContextForFootprint(footprint);
-        if (!riverContext || !riverContext.segments.length || !riverContext.points.length) continue;
-        activeRiverSegments = riverContext.segments;
-        activeRiverPoints = riverContext.points;
-        const closest = closestPointOnPolyline(footprint.center, activeRiverSegments);
-        const direction = closest ? bearingTo(footprint.center, closest.point) : null;
-        const candidateData = collectFacadeCandidates(footprint);
-        const floorBands = buildFloorBands(footprint, candidateData);
-        const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
-        const facadeView = summarizeFacadeCandidates(
-          footprint,
-          candidateData,
-          floorEyeHeight(footprint, displayFloor)
-        );
-        const totalOpen = facadeView.totalOpen;
-        const grade = totalOpen >= 60 ? "전면 조망" :
-          totalOpen >= 30 ? "양호한 부분 조망" :
-          totalOpen >= 10 ? "틈새 조망" :
-          facadeView.visibleFacadeLength > 0 ? "제한적 조망" : "차폐";
+      const targetFootprints = targetFootprintsForZone(cacheKey);
+      const label = zoneLabelForStatus(cacheKey);
+      if (!targetFootprints.length) {
+        setStatus(`${label} 계산 대상 유닛이 없습니다.`);
+        return;
+      }
 
-        viewAnalysisByFid.set(String(footprint.fid), {
-          riverDistance: closest ? closest.distance : null,
-          riverBearing: direction,
-          riverBearingName: direction === null ? "" : bearingName(direction),
-          targetSpan: facadeView.targetSpan,
-          openByDirection: facadeView.openByDirection,
-          openRaysByDirection: facadeView.openRaysByDirection,
-          allOpenSummary: facadeView.allOpenSummary,
-          allOpenRays: facadeView.allOpenRays,
-          totalOpen,
-          visibleFacadeLength: facadeView.visibleFacadeLength,
-          visibleFacadeSegments: facadeView.visibleFacadeSegments,
-          visibleSampleCount: facadeView.visibleSampleCount,
-          sampleCount: facadeView.sampleCount,
-          candidateData,
-          floorBands,
-          displayFloor,
-          displayEyeHeight: facadeView.observerHeight,
-          blockers: facadeView.blockers.slice(0, 3),
-          grade
-        });
+      const startMs = performance.now();
+      let completed = 0;
+      let analyzed = 0;
+      setStatus(`${label} 조망 계산 중... 0/${targetFootprints.length}`);
+
+      for (const footprint of targetFootprints) {
+        if (storeViewAnalysisForFootprint(footprint)) analyzed += 1;
+        completed += 1;
+        if (completed % 2 === 0 || completed === targetFootprints.length) {
+          setStatus(`${label} 조망 계산 중... ${completed}/${targetFootprints.length}`);
+          await new Promise(resolve => requestAnimationFrame(resolve));
+        }
       }
 
       activeRiverSegments = riverSegments;
       activeRiverPoints = riverPoints;
+      calculatedZones.add(cacheKey);
+      refreshLoadedDescriptions();
+      const seconds = ((performance.now() - startMs) / 1000).toFixed(1);
+      setStatus(`${label} 조망 계산 완료\n계산 유닛: ${analyzed}/${targetFootprints.length}\n소요: ${seconds}초`);
+    }
+
+    function analyzeViewsForZone(zoneId, options = {}) {
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      const cacheKey = normalizedZoneId || "ALL";
+      if (!options.force && calculatedZones.has(cacheKey)) {
+        return Promise.resolve();
+      }
+      if (calculatingZonePromises.has(cacheKey)) {
+        return calculatingZonePromises.get(cacheKey);
+      }
+
+      const promise = zoneCalculationQueue
+        .then(() => runZoneAnalysis(cacheKey, options))
+        .finally(() => calculatingZonePromises.delete(cacheKey));
+      calculatingZonePromises.set(cacheKey, promise);
+      zoneCalculationQueue = promise.catch(() => {});
+      return promise;
     }
 
     function clearOutlines() {
@@ -2644,17 +2725,30 @@
       }
     }
 
-    function recalculateViews(message = "조망 계산 갱신 완료") {
+    async function recalculateViews(message = "조망 계산 갱신 완료") {
       if (!riverRawGeoJson) {
         setStatus("한강라인 GeoJSON이 아직 로드되지 않았습니다.");
         return;
       }
+
+      const zonesToRecalculate = new Set(calculatedZones);
+      const selectedZoneId = zoneIdFromEntity(viewer.selectedEntity);
+      if (selectedZoneId) zonesToRecalculate.add(selectedZoneId);
+      if (!zonesToRecalculate.size && currentZoneId !== "ALL") zonesToRecalculate.add(currentZoneId);
+
       rebuildRiverContexts();
       lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
       drawRiverLines();
-      analyzeViews();
+      resetViewAnalysisCache();
       refreshLoadedDescriptions();
-      setStatus(`${message}\n${riverStatusText()}\n유닛 수: ${footprints.length}`);
+
+      if (zonesToRecalculate.size) {
+        for (const zoneId of zonesToRecalculate) {
+          await analyzeViewsForZone(zoneId, { force: true });
+        }
+      }
+
+      setStatus(`${message}\n${riverStatusText()}\n유닛 수: ${footprints.length}\n계산 완료 구역: ${[...calculatedZones].map(zoneLabelForStatus).join(", ") || "없음"}`);
       if (viewer.selectedEntity) {
         drawSelectedSightLines(viewer.selectedEntity);
         updateSelectionDetails(viewer.selectedEntity);
@@ -2674,7 +2768,7 @@
       clearOutlines();
       clearSelectedSightLines();
       prepareFootprints(input);
-      analyzeViews();
+      resetViewAnalysisCache();
 
       const source = await Cesium.GeoJsonDataSource.load(input, {
         clampToGround: false,
@@ -3088,7 +3182,7 @@
         try {
           const text = await file.text();
           riverRawGeoJson = JSON.parse(text);
-          recalculateViews("수동 한강라인 로드 완료");
+          await recalculateViews("수동 한강라인 로드 완료");
         } catch (error) {
           setStatus(`한강라인 수동 로드 실패: ${error.message}`);
         }
@@ -3147,19 +3241,37 @@
       updatePickedHeightDetails(movement.position);
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    viewer.selectedEntityChanged.addEventListener((entity) => {
+    viewer.selectedEntityChanged.addEventListener(async (entity) => {
       updateEyeFloorInput(entity);
-      drawSelectedSightLines(entity);
-      showLegendForSelectedEntity(entity);
-      if (!entity && lastPickedHeightScreenPosition) {
-        setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
-      } else {
-        updateSelectionDetails(entity);
+      clearSelectedSightLines();
+
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        if (lastPickedHeightScreenPosition) {
+          setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
+        } else {
+          updateSelectionDetails(null);
+        }
+        return;
       }
+
+      showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
+
+      const zoneId = zoneIdFromEntity(entity);
+      const fid = String(entity.fidValue);
+      if (!viewAnalysisByFid.has(fid)) {
+        setStatus(`${zoneLabelForStatus(zoneId)} 조망 계산을 시작합니다.`);
+        await analyzeViewsForZone(zoneId);
+      }
+
+      if (viewer.selectedEntity !== entity) return;
+      drawSelectedSightLines(entity);
+      updateSelectionDetails(entity);
+      updateFloorTotalAngle(entity);
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
-    setTimeout(() => showOsmBuildings(), 900);
+    // OSM 3D 건물은 초기 로딩 속도를 위해 자동 표시하지 않습니다. 필요 시 showOsmBuildings()를 수동 호출하세요.
 
     loadZone(currentZoneId);
   </script>
