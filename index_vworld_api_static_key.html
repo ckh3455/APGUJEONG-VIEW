@@ -108,7 +108,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션 - VWorld 3D 테스트</h1>
-    <div class="hint">VWorld WebGL 3D API 3.0 기반 테스트입니다. 인증키를 HTML head에 직접 내장해 VWorld 공식 샘플 방식으로 실행하고, 주변 입체건물은 VWorld의 facility_build 레이어를 사용합니다.</div>
+    <div class="hint">VWorld WebGL 3D API 3.0 기반 테스트입니다. 인증키를 HTML head에 직접 내장해 VWorld 공식 샘플 방식으로 실행하고, 주변 입체건물은 VWorld의 facility_build 레이어를 사용하고, 클리핑 존 내부 기존 건물은 가능한 경우 3D Tiles 클리핑으로 제거합니다.</div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" data-zone="ALL" class="active">전체</button>
       <button type="button" data-zone="2" class="muted">2구역</button>
@@ -128,7 +128,7 @@
   <script>
     const APGUJEONG_CENTER = { lon: 127.03255, lat: 37.52545, height: 920 };
     const DEFAULT_VWORLD_KEY = "CA1C58DA-9B9E-30C8-A48F-7695F9D73A77";
-    const DATA_VERSION = "vworld-api-static-head-key-20260706";
+    const DATA_VERSION = "vworld-api-static-head-key-clipping-20260706";
     const ZONE_URLS = {
       "2": ["apgujeong_2_units.geojson", "apgujeong_2_units(6).geojson"],
       "3": ["apg3_unit_polygon.geojson", "apg3_unit_polygon (1)(1).geojson"],
@@ -136,6 +136,7 @@
       "5": ["apgujeong_5_units.geojson", "apgujeong_5_units (1).geojson"]
     };
     const RIVER_URLS = ["hangang_line_all.geojson", "hangang_line_all (1)(2).geojson"];
+    const CLIP_URLS = ["apgujeong_osm_clipping_zones.geojson", "apgujeong_osm_clipping_zones (1).geojson"];
 
     let map = null;
     let viewer = null;
@@ -169,7 +170,7 @@
       throw lastError || new Error("파일을 찾지 못했습니다.");
     }
 
-    function colorFromHex(value, fallback = "#7dd3fc", alpha = 0.72) {
+    function colorFromHex(value, fallback = "#7dd3fc", alpha = 0.96) {
       const text = String(value || "").trim();
       const css = /^#[0-9a-fA-F]{6}$/.test(text) ? text : (/^[0-9a-fA-F]{6}$/.test(text) ? `#${text}` : fallback);
       return Cesium.Color.fromCssColorString(css).withAlpha(alpha);
@@ -248,7 +249,7 @@
                 hierarchy: positionsFromRing(ring),
                 height: 0,
                 extrudedHeight: height,
-                material: colorFromHex(props.color || props.fill || props.fill_color, "#7dd3fc", 0.72),
+                material: colorFromHex(props.color || props.fill || props.fill_color, "#7dd3fc", 0.96),
                 outline: true,
                 outlineColor: Cesium.Color.BLACK
               },
@@ -288,6 +289,120 @@
         }
       } catch (error) {
         setStatus(`한강라인 로드 실패: ${error.message}`);
+      }
+    }
+
+
+    function polygonPositionsFromFeature(feature) {
+      const geometry = feature && feature.geometry;
+      if (!geometry) return [];
+      const rings = [];
+      if (geometry.type === "Polygon") {
+        rings.push(geometry.coordinates[0]);
+      } else if (geometry.type === "MultiPolygon") {
+        for (const polygon of geometry.coordinates || []) rings.push(polygon[0]);
+      }
+      return rings
+        .filter(ring => Array.isArray(ring) && ring.length >= 3)
+        .map(ring => {
+          const clean = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+            ? ring.slice(0, -1)
+            : ring;
+          const flat = [];
+          for (const coord of clean) flat.push(Number(coord[0]), Number(coord[1]));
+          return Cesium.Cartesian3.fromDegreesArray(flat);
+        });
+    }
+
+    function createClippingPolygonsFromGeoJson(data) {
+      if (!Cesium.ClippingPolygon || !Cesium.ClippingPolygonCollection) {
+        throw new Error("현재 VWorld 내부 Cesium 버전이 ClippingPolygonCollection을 지원하지 않습니다.");
+      }
+      const polygons = [];
+      for (const feature of data.features || []) {
+        for (const positions of polygonPositionsFromFeature(feature)) {
+          polygons.push(new Cesium.ClippingPolygon({ positions }));
+        }
+      }
+      if (!polygons.length) throw new Error("클리핑 존 폴리곤을 찾지 못했습니다.");
+
+      // inverse:true = 클리핑 폴리곤 내부를 잘라냄. 압구정 구역 내부의 기존 VWorld 건물을 제거하기 위한 설정.
+      return new Cesium.ClippingPolygonCollection({
+        polygons,
+        inverse: true,
+        enabled: true
+      });
+    }
+
+    function looksLikeTileset(primitive) {
+      if (!primitive) return false;
+      const name = primitive.constructor && primitive.constructor.name ? primitive.constructor.name : "";
+      return primitive instanceof Cesium.Cesium3DTileset || /3DTileset/i.test(name) || Boolean(primitive.asset && primitive.root && primitive.tilesLoaded !== undefined);
+    }
+
+    function collectTilesetsFromPrimitive(primitive, out, seen) {
+      if (!primitive || seen.has(primitive)) return;
+      seen.add(primitive);
+      if (looksLikeTileset(primitive)) out.push(primitive);
+
+      const nestedCollections = [primitive._primitives, primitive._orderedPrimitives, primitive._groundPrimitives];
+      for (const collection of nestedCollections) {
+        if (!collection) continue;
+        const length = Number(collection.length || (collection._primitives && collection._primitives.length) || 0);
+        if (typeof collection.get === "function") {
+          for (let i = 0; i < length; i += 1) collectTilesetsFromPrimitive(collection.get(i), out, seen);
+        } else if (Array.isArray(collection)) {
+          for (const item of collection) collectTilesetsFromPrimitive(item, out, seen);
+        } else if (Array.isArray(collection._primitives)) {
+          for (const item of collection._primitives) collectTilesetsFromPrimitive(item, out, seen);
+        }
+      }
+    }
+
+    function collectSceneTilesets() {
+      const out = [];
+      const seen = new Set();
+      collectTilesetsFromPrimitive(viewer.scene.primitives, out, seen);
+      return out;
+    }
+
+    async function applyVworldBuildingClipping() {
+      try {
+        const data = await fetchFirst(CLIP_URLS);
+        const clippingPolygons = createClippingPolygonsFromGeoJson(data);
+        const tilesets = collectSceneTilesets();
+        let applied = 0;
+        for (const tileset of tilesets) {
+          try {
+            tileset.clippingPolygons = clippingPolygons;
+            applied += 1;
+          } catch (error) {
+            console.warn("tileset clipping failed", tileset, error);
+          }
+        }
+        if (!applied) {
+          setStatus("클리핑 존은 읽었지만 VWorld 건물 3D Tileset을 아직 찾지 못했습니다. 지도가 더 로드된 뒤 다시 적용을 시도합니다.");
+          return false;
+        }
+        setStatus(`VWorld 주변건물 표시 완료. 클리핑 존 내부 기존 건물을 제거했습니다. 적용 tileset: ${applied}개`);
+        if (viewer.scene && viewer.scene.requestRender) viewer.scene.requestRender();
+        return true;
+      } catch (error) {
+        setStatus(`VWorld 건물 클리핑 실패: ${error.message}`);
+        console.warn(error);
+        return false;
+      }
+    }
+
+    function scheduleVworldBuildingClipping() {
+      // facility_build가 늦게 올라오는 경우가 있어 여러 번 재시도합니다.
+      const delays = [1200, 2500, 4500, 7000];
+      for (const delay of delays) {
+        setTimeout(async () => {
+          if (!viewer) return;
+          const ok = await applyVworldBuildingClipping();
+          if (ok) return;
+        }, delay);
       }
     }
 
@@ -340,6 +455,7 @@
       vworldBuildingsVisible = visible;
       document.getElementById("toggleVworldBuildings").textContent = visible ? "VWorld 주변건물 숨김" : "VWorld 주변건물 표시";
       setStatus(visible ? "VWorld 주변건물을 표시했습니다." : "VWorld 주변건물을 숨겼습니다.");
+      if (visible) setTimeout(() => applyVworldBuildingClipping(), 900);
     }
 
     function setActiveZoneButton(zone) {
@@ -373,6 +489,7 @@
         setStatus("VWorld 3D 지도 로드 완료. 유닛 데이터를 올리는 중...");
         resetView();
         setTimeout(() => setVworldBuildingsVisible(true), 800);
+        scheduleVworldBuildingClipping();
         viewer.selectedEntityChanged.addEventListener(showUnitDetail);
         await loadRiverLine();
         await loadUnits("ALL");
