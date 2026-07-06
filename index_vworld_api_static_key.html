@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>압구정 조망 시뮬레이션 - VWorld 3D 테스트</title>
+  <style>
+    html, body, #vmap {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, "Malgun Gothic", sans-serif;
+      background: #dbe5ef;
+    }
+    .panel {
+      position: absolute;
+      z-index: 20;
+      top: 10px;
+      left: 10px;
+      width: 440px;
+      max-width: calc(100vw - 26px);
+      padding: 10px;
+      background: rgba(255,255,255,0.94);
+      border: 1px solid #d9dee7;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    h1 { margin: 0 0 6px; font-size: 14px; }
+    .hint { color: #64748b; font-size: 10px; margin-bottom: 7px; }
+    .buttons, .zone-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    button {
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 7px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    button.secondary { background: #475569; }
+    button.muted { background: #e2e8f0; color: #1e293b; }
+    button.active { background: #2563eb; color: #fff; }
+    input[type="text"] {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .status {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 7px;
+      background: #f1f5f9;
+      color: #334155;
+      white-space: pre-wrap;
+      max-height: 130px;
+      overflow: auto;
+    }
+    .detail {
+      margin-top: 7px;
+      padding: 8px;
+      border-radius: 7px;
+      background: rgba(15,23,42,0.88);
+      color: #f8fafc;
+      min-height: 48px;
+      font-size: 10px;
+    }
+    .detail table { width: 100%; border-collapse: collapse; }
+    .detail th, .detail td { border-bottom: 1px solid rgba(255,255,255,0.08); padding: 4px 5px; text-align: left; vertical-align: top; }
+    .detail th { width: 80px; color: #cbd5e1; white-space: nowrap; }
+    .key-panel {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15,23,42,0.55);
+      backdrop-filter: blur(2px);
+    }
+    .key-card {
+      width: 460px;
+      max-width: calc(100vw - 32px);
+      padding: 18px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+      color: #0f172a;
+    }
+    .key-card h2 { margin: 0 0 8px; font-size: 16px; }
+    .key-card p { margin: 6px 0; font-size: 12px; color: #475569; line-height: 1.45; }
+    .key-card .buttons { justify-content: flex-end; }
+    @media (max-width: 768px) {
+      .panel { width: calc(100vw - 26px); max-height: 45svh; overflow: auto; }
+    }
+  </style>
+  <script type="text/javascript" src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=CA1C58DA-9B9E-30C8-A48F-7695F9D73A77"></script>
+</head>
+<body>
+  <div id="vmap"></div>
+
+  <div class="panel">
+    <h1>압구정 조망 시뮬레이션 - VWorld 3D 테스트</h1>
+    <div class="hint">VWorld WebGL 3D API 3.0 기반 테스트입니다. 인증키를 HTML head에 직접 내장해 VWorld 공식 샘플 방식으로 실행하고, 주변 입체건물은 VWorld의 facility_build 레이어를 사용합니다.</div>
+    <div class="zone-tabs" aria-label="구역 선택">
+      <button type="button" data-zone="ALL" class="active">전체</button>
+      <button type="button" data-zone="2" class="muted">2구역</button>
+      <button type="button" data-zone="3" class="muted">3구역</button>
+      <button type="button" data-zone="4" class="muted">4구역</button>
+      <button type="button" data-zone="5" class="muted">5구역</button>
+    </div>
+    <div class="buttons">
+      <button id="toggleVworldBuildings" class="secondary">VWorld 주변건물 숨김</button>
+      <button id="resetView" class="secondary">초기 시점</button>
+      <button id="clearSelection" class="secondary">선택 해제</button>
+    </div>
+    <div id="status" class="status">VWorld API 준비 중...</div>
+    <div id="detail" class="detail">유닛을 클릭하면 상세정보가 표시됩니다.</div>
+  </div>
+
+  <script>
+    const APGUJEONG_CENTER = { lon: 127.03255, lat: 37.52545, height: 920 };
+    const DEFAULT_VWORLD_KEY = "CA1C58DA-9B9E-30C8-A48F-7695F9D73A77";
+    const DATA_VERSION = "vworld-api-static-head-key-20260706";
+    const ZONE_URLS = {
+      "2": ["apgujeong_2_units.geojson", "apgujeong_2_units(6).geojson"],
+      "3": ["apg3_unit_polygon.geojson", "apg3_unit_polygon (1)(1).geojson"],
+      "4": ["apgujeong_4_units.geojson", "apgujeong_4_units (1).geojson"],
+      "5": ["apgujeong_5_units.geojson", "apgujeong_5_units (1).geojson"]
+    };
+    const RIVER_URLS = ["hangang_line_all.geojson", "hangang_line_all (1)(2).geojson"];
+
+    let map = null;
+    let viewer = null;
+    let currentZone = "ALL";
+    let vworldBuildingsVisible = true;
+    const unitEntities = [];
+    const riverEntities = [];
+    const zoneDataCache = new Map();
+    const statusEl = document.getElementById("status");
+    const detailEl = document.getElementById("detail");
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function getEmbeddedKey() {
+      return DEFAULT_VWORLD_KEY.trim();
+    }
+
+    async function fetchFirst(urls) {
+      let lastError = null;
+      for (const url of urls) {
+        try {
+          const response = await fetch(`${url}?v=${encodeURIComponent(DATA_VERSION)}`, { cache: "no-store" });
+          if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("파일을 찾지 못했습니다.");
+    }
+
+    function colorFromHex(value, fallback = "#7dd3fc", alpha = 0.72) {
+      const text = String(value || "").trim();
+      const css = /^#[0-9a-fA-F]{6}$/.test(text) ? text : (/^[0-9a-fA-F]{6}$/.test(text) ? `#${text}` : fallback);
+      return Cesium.Color.fromCssColorString(css).withAlpha(alpha);
+    }
+
+    function totalHeight(props) {
+      const floors = Number(props.floors || props.floor || props.max_floor || 0);
+      const floorH = Number(props.floor_h || props.floor_height || 3.692);
+      const piloti = Number(props.piloti_m || props.piloti || 0);
+      const heightM = Number(props.height_m || 0);
+      if (heightM > 0) return heightM + piloti;
+      if (floors > 0 && floorH > 0) return floors * floorH + piloti;
+      return 20;
+    }
+
+    function unitName(props) {
+      const zone = String(props.source_zone || props.zone || "").trim();
+      const dong = String(props.dong || "").trim();
+      const unit = String(props.unit_type || props.unit || props.type || "").trim();
+      const zoneLabel = zone ? `${zone}구역 ` : "";
+      const dongLabel = dong ? `${dong}동` : "유닛";
+      const unitLabel = unit ? ` ${unit}PY` : "";
+      return `${zoneLabel}${dongLabel}${unitLabel}`;
+    }
+
+    function positionsFromRing(ring) {
+      const flat = [];
+      const clean = ring.length > 1 && ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1]
+        ? ring.slice(0, -1)
+        : ring;
+      for (const coord of clean) flat.push(coord[0], coord[1]);
+      return Cesium.Cartesian3.fromDegreesArray(flat);
+    }
+
+    function ringsFromFeature(feature) {
+      const geometry = feature.geometry;
+      if (!geometry) return [];
+      if (geometry.type === "Polygon") return [geometry.coordinates[0]];
+      if (geometry.type === "MultiPolygon") return geometry.coordinates.map(poly => poly[0]);
+      return [];
+    }
+
+    function clearEntities(list) {
+      while (list.length) viewer.entities.remove(list.pop());
+    }
+
+    async function loadZoneData(zoneId) {
+      if (zoneDataCache.has(zoneId)) return zoneDataCache.get(zoneId);
+      const data = await fetchFirst(ZONE_URLS[zoneId]);
+      for (const [i, feature] of (data.features || []).entries()) {
+        feature.properties = feature.properties || {};
+        if (!feature.properties.source_zone) feature.properties.source_zone = zoneId;
+        if (!feature.properties.fid) feature.properties.fid = `${zoneId}-${i + 1}`;
+      }
+      zoneDataCache.set(zoneId, data);
+      return data;
+    }
+
+    async function loadUnits(zone = "ALL") {
+      currentZone = zone;
+      clearEntities(unitEntities);
+      detailEl.textContent = "유닛을 클릭하면 상세정보가 표시됩니다.";
+      setActiveZoneButton(zone);
+      const zones = zone === "ALL" ? ["2", "3", "4", "5"] : [zone];
+      setStatus(`${zone === "ALL" ? "전체" : `${zone}구역`} 유닛 로드 중...`);
+      let count = 0;
+      for (const zoneId of zones) {
+        const data = await loadZoneData(zoneId);
+        for (const feature of data.features || []) {
+          const props = feature.properties || {};
+          for (const ring of ringsFromFeature(feature)) {
+            const height = totalHeight(props);
+            const entity = viewer.entities.add({
+              name: unitName(props),
+              polygon: {
+                hierarchy: positionsFromRing(ring),
+                height: 0,
+                extrudedHeight: height,
+                material: colorFromHex(props.color || props.fill || props.fill_color, "#7dd3fc", 0.72),
+                outline: true,
+                outlineColor: Cesium.Color.BLACK
+              },
+              properties: props
+            });
+            entity.apgujeongProps = props;
+            unitEntities.push(entity);
+            count += 1;
+          }
+        }
+      }
+      setStatus(`${zone === "ALL" ? "전체" : `${zone}구역`} 유닛 ${count}개 표시 완료. VWorld 주변건물과 비교해보세요.`);
+    }
+
+    async function loadRiverLine() {
+      clearEntities(riverEntities);
+      try {
+        const data = await fetchFirst(RIVER_URLS);
+        for (const feature of data.features || []) {
+          const geometry = feature.geometry;
+          if (!geometry) continue;
+          const lines = geometry.type === "LineString" ? [geometry.coordinates] : (geometry.type === "MultiLineString" ? geometry.coordinates : []);
+          for (const line of lines) {
+            const flat = [];
+            for (const coord of line) flat.push(coord[0], coord[1], 4);
+            const entity = viewer.entities.add({
+              name: "한강 조망라인",
+              polyline: {
+                positions: Cesium.Cartesian3.fromDegreesArrayHeights(flat),
+                width: 4,
+                material: Cesium.Color.CYAN.withAlpha(0.95),
+                clampToGround: false
+              }
+            });
+            riverEntities.push(entity);
+          }
+        }
+      } catch (error) {
+        setStatus(`한강라인 로드 실패: ${error.message}`);
+      }
+    }
+
+    function showUnitDetail(entity) {
+      const props = entity && entity.apgujeongProps;
+      if (!props) {
+        detailEl.textContent = "유닛을 클릭하면 상세정보가 표시됩니다.";
+        return;
+      }
+      const rows = [
+        ["구역", `${props.source_zone || props.zone || ""}구역`],
+        ["동", `${props.dong || ""}동`],
+        ["평형", props.unit_type || props.unit || ""],
+        ["층수", props.floors || props.floor || ""],
+        ["층고", props.floor_h || props.floor_height || ""],
+        ["필로티", props.piloti_m || props.piloti || "0"],
+        ["총높이", `${Math.round(totalHeight(props) * 10) / 10}m`]
+      ];
+      detailEl.innerHTML = `<table>${rows.map(([k, v]) => `<tr><th>${k}</th><td>${String(v)}</td></tr>`).join("")}</table>`;
+    }
+
+    function resetView() {
+      if (!viewer || !Cesium) return;
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(APGUJEONG_CENTER.lon, APGUJEONG_CENTER.lat, APGUJEONG_CENTER.height),
+        orientation: {
+          heading: Cesium.Math.toRadians(335),
+          pitch: Cesium.Math.toRadians(-48),
+          roll: 0
+        }
+      });
+    }
+
+    function getVworldLayer(id) {
+      try {
+        return map && map.getElementById ? map.getElementById(id) : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function setVworldBuildingsVisible(visible) {
+      const layer = getVworldLayer("facility_build");
+      if (!layer) {
+        setStatus("VWorld 건물 레이어(facility_build)를 아직 찾지 못했습니다. 지도가 완전히 뜬 뒤 다시 눌러보세요.");
+        return;
+      }
+      if (visible && layer.show) layer.show();
+      if (!visible && layer.hide) layer.hide();
+      vworldBuildingsVisible = visible;
+      document.getElementById("toggleVworldBuildings").textContent = visible ? "VWorld 주변건물 숨김" : "VWorld 주변건물 표시";
+      setStatus(visible ? "VWorld 주변건물을 표시했습니다." : "VWorld 주변건물을 숨겼습니다.");
+    }
+
+    function setActiveZoneButton(zone) {
+      for (const button of document.querySelectorAll("[data-zone]")) {
+        const active = button.dataset.zone === zone;
+        button.classList.toggle("active", active);
+        button.classList.toggle("muted", !active);
+      }
+    }
+
+    async function startVworld() {
+      setStatus("VWorld API 객체 확인 중...");
+      // VWorld WebGL 3D API 3.0은 공식 샘플처럼 <head>에서 동기 script로 먼저 불러와야 안정적입니다.
+      if (!window.vw) {
+        throw new Error("VWorld API 객체(vw)를 찾지 못했습니다. 스크립트 로드 또는 서비스 URL 등록 상태를 확인하세요.");
+      }
+
+      const initPosition = new vw.CameraPosition(
+        new vw.CoordZ(APGUJEONG_CENTER.lon, APGUJEONG_CENTER.lat, APGUJEONG_CENTER.height),
+        new vw.Direction(335, -48, 0)
+      );
+      const options = {
+        mapId: "vmap",
+        initPosition,
+        logo: true,
+        navigation: true
+      };
+
+      vw.ws3dInitCallBack = async function () {
+        viewer = ws3d.viewer;
+        setStatus("VWorld 3D 지도 로드 완료. 유닛 데이터를 올리는 중...");
+        resetView();
+        setTimeout(() => setVworldBuildingsVisible(true), 800);
+        viewer.selectedEntityChanged.addEventListener(showUnitDetail);
+        await loadRiverLine();
+        await loadUnits("ALL");
+      };
+
+      map = new vw.Map();
+      map.setOption(options);
+      map.start();
+    }
+
+    document.getElementById("toggleVworldBuildings").addEventListener("click", () => {
+      setVworldBuildingsVisible(!vworldBuildingsVisible);
+    });
+
+    document.getElementById("resetView").addEventListener("click", resetView);
+    document.getElementById("clearSelection").addEventListener("click", () => {
+      if (viewer) viewer.selectedEntity = undefined;
+      showUnitDetail(null);
+    });
+
+    for (const button of document.querySelectorAll("[data-zone]")) {
+      button.addEventListener("click", () => loadUnits(button.dataset.zone));
+    }
+
+    startVworld().catch(error => {
+      setStatus(`VWorld 실행 실패: ${error.message}`);
+      console.error(error);
+      alert(`VWorld 실행 실패: ${error.message}
+
+키는 HTML 안에 내장되어 있습니다. 그래도 실패하면 VWorld 인증키 관리화면에서 서비스 URL에 현재 GitHub Pages 주소가 등록되어 있는지 확인해야 합니다.`);
+    });
+  </script>
+</body>
+</html>
