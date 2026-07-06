@@ -3271,9 +3271,13 @@
     });
 
     setTimeout(() => applyPublicBaseMap("street"), 300);
-    // OSM 3D 건물은 초기 로딩 속도를 위해 자동 표시하지 않습니다. 필요 시 showOsmBuildings()를 수동 호출하세요.
 
     loadZone(currentZoneId);
+
+    // 주변 OSM 3D 건물은 유닛/지도 초기 표시를 먼저 끝낸 뒤 지연 로딩합니다.
+    setTimeout(() => {
+      showOsmBuildings();
+    }, 3000);
   </script>
 </body>
 </html>
