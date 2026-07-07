@@ -112,12 +112,6 @@
       font-weight: 900;
       white-space: nowrap;
     }
-    .osm-note {
-      margin-top: 5px;
-      color: #64748b;
-      font-size: 9px;
-      line-height: 1.25;
-    }
     .zone-tabs button.active,
     .map-tabs button.active {
       background: #2563eb;
@@ -166,6 +160,43 @@
       height: 8px;
       border: 1px solid rgba(0, 0, 0, 0.25);
       border-radius: 2px;
+    }
+    .promo-card {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid #d9e3f3;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(246,249,255,0.98) 100%);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.10);
+    }
+    .promo-accent {
+      width: 42px;
+      height: 3px;
+      margin-bottom: 8px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+    }
+    .promo-brand {
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .promo-contact {
+      margin-top: 5px;
+      color: #2563eb;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+    }
+    .promo-note {
+      margin-top: 6px;
+      color: #475569;
+      font-size: 9px;
+      line-height: 1.45;
+      word-break: keep-all;
     }
     .legend-detail-wrap {
       display: grid;
@@ -342,6 +373,21 @@
         width: 7px;
         height: 7px;
       }
+      .promo-card {
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 10px;
+      }
+      .promo-brand {
+        font-size: 11px;
+      }
+      .promo-contact {
+        font-size: 9.5px;
+      }
+      .promo-note {
+        font-size: 8px;
+        line-height: 1.35;
+      }
       .cesium-infoBox {
         top: 8px !important;
         left: calc(46vw + 4px) !important;
@@ -450,12 +496,17 @@
       <button id="startEyeRotate" class="secondary">눈높이 360도</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
     </div>
-    <div class="osm-note">흰색 불투명 OSM 기존건물은 필요 시 수동으로 표시하고, QGIS 구역경계가 있으면 그 경계로 내부를 잘라냅니다.</div>
     <div id="status" class="status" hidden></div>
     <div class="legend-detail-wrap">
       <div class="legend-section">
         <label>평형 범례</label>
         <div class="legend" id="legend"></div>
+        <div class="promo-card" aria-label="업소 안내">
+          <div class="promo-accent"></div>
+          <div class="promo-brand">압구정 원 부동산중개</div>
+          <div class="promo-contact">02.504.3334 · 010.3065.1780</div>
+          <div class="promo-note">상담을 원하시는 분은 사전에 시간 약속 후 방문 부탁드립니다.</div>
+        </div>
       </div>
       <div class="selection-detail" aria-live="polite">
         <div class="selection-detail-title" id="selectionDetailTitle">선택 상세</div>
