@@ -477,7 +477,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v40-lazy-zone-analysis / 유닛 클릭 시 구역별 조망 계산</div>
+    <div class="hint">버전: v41 / <strong>정밀도면이 아닙니다</strong></div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -523,7 +523,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v40-lazy-zone-analysis-20260706";
+    const DATA_VERSION = "v41-same-dong-envelope-20260709";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -997,6 +997,11 @@
     const METERS_PER_DEG_LON = 111320 * Math.cos(Cesium.Math.toRadians(ORIGIN_LAT));
     const EXTERIOR_HULL_TOLERANCE_M = 2;
     const FACADE_SAMPLE_STEP_M = 2;
+    // 같은 동 보정: 평형별 유닛 사이에 생략된 외벽/코어를 계산용 외피로 닫는다.
+    // 외피는 실제 유닛 라인에 최대한 붙이고, 유닛 사이의 최단거리만 보조 연결선으로 막는다.
+    const SAME_DONG_NEAREST_BRIDGE_ENABLED = true;
+    const SAME_DONG_NEAREST_BRIDGE_MAX_M = 18;
+    const SAME_DONG_INTERNAL_RAY_EPS_M = 0.15;
 
     function lonLatToXY(lon, lat) {
       return {
@@ -1200,20 +1205,60 @@
         .map(([, item]) => item);
     }
 
+    function closestSegmentConnection(segmentA, segmentB) {
+      if (!segmentA || !segmentB) return null;
+      if (segmentsIntersect(segmentA.a, segmentA.b, segmentB.a, segmentB.b)) {
+        return { distance: 0, a: segmentA.a, b: segmentA.a };
+      }
+      const candidates = [];
+      const addCandidate = (p, q) => candidates.push({ a: p, b: q, distance: distance(p, q) });
+      addCandidate(segmentA.a, closestPointOnSegment(segmentA.a, segmentB.a, segmentB.b));
+      addCandidate(segmentA.b, closestPointOnSegment(segmentA.b, segmentB.a, segmentB.b));
+      addCandidate(closestPointOnSegment(segmentB.a, segmentA.a, segmentA.b), segmentB.a);
+      addCandidate(closestPointOnSegment(segmentB.b, segmentA.a, segmentA.b), segmentB.b);
+      return candidates.reduce((best, candidate) => !best || candidate.distance < best.distance ? candidate : best, null);
+    }
+
+    function addNearestBridgeSegment(segments, a, b, maxGap = SAME_DONG_NEAREST_BRIDGE_MAX_M) {
+      const gap = distance(a, b);
+      if (gap < 0.5 || gap > maxGap) return false;
+      const key = segmentKey({ a, b });
+      if (segments.has(key)) return false;
+      segments.set(key, { a, b, isCoreBridge: true, isNearestBridge: true });
+      return true;
+    }
+
     function coreBridgeSegmentsFromFootprints(groupFootprints) {
-      const items = exteriorSegmentItemsFromFootprints(groupFootprints);
+      const footprintsInGroup = (groupFootprints || []).filter(Boolean);
       const bridges = new Map();
-      for (let i = 0; i < items.length; i += 1) {
-        for (let j = i + 1; j < items.length; j += 1) {
-          if (items[i].footprint === items[j].footprint) continue;
-          const a = items[i].segment;
-          const b = items[j].segment;
-          const gap = segmentSegmentDistance(a.a, a.b, b.a, b.b);
-          if (gap <= 0.5 || gap > SAME_DONG_CORE_GAP_M) continue;
-          addCoreBridgeSamples(bridges, a, b);
-          addCoreBridgeSamples(bridges, b, a);
+      if (!SAME_DONG_NEAREST_BRIDGE_ENABLED || footprintsInGroup.length <= 1) return [];
+
+      const pairBest = [];
+      for (let i = 0; i < footprintsInGroup.length; i += 1) {
+        for (let j = i + 1; j < footprintsInGroup.length; j += 1) {
+          const source = footprintsInGroup[i];
+          const target = footprintsInGroup[j];
+          let best = null;
+          for (const sourceSegment of source.segments || []) {
+            for (const targetSegment of target.segments || []) {
+              const connection = closestSegmentConnection(sourceSegment, targetSegment);
+              if (!connection || connection.distance <= 0.5 || connection.distance > SAME_DONG_NEAREST_BRIDGE_MAX_M) continue;
+              if (!best || connection.distance < best.distance) {
+                best = { ...connection, source, target };
+              }
+            }
+          }
+          if (best) pairBest.push(best);
         }
       }
+
+      // 각 유닛쌍마다 가장 가까운 지점만 연결한다.
+      // 넓은 convex hull 외피가 유닛과 떨어져 조망각을 왜곡하는 문제를 피하기 위한 방식이다.
+      pairBest.sort((a, b) => a.distance - b.distance);
+      for (const candidate of pairBest) {
+        addNearestBridgeSegment(bridges, candidate.a, candidate.b);
+      }
+
       return [...bridges.values()];
     }
 
@@ -1398,6 +1443,10 @@
         footprint.groupCenter = ringCentroid(group);
         footprint.groupExteriorSegments = dongExteriorSegments.get(footprint.groupKey) || footprint.segments;
         footprint.groupCoreBridgeSegments = dongCoreBridgeSegments.get(footprint.groupKey) || [];
+        footprint.groupBarrierSegments = [
+          ...footprint.groupExteriorSegments,
+          ...footprint.groupCoreBridgeSegments
+        ];
       }
     }
 
@@ -1517,26 +1566,39 @@
     function rayHitsSameDongCoreBridge(origin, bearing, maxDistance, sourceFootprint) {
       for (const segment of sourceFootprint.groupCoreBridgeSegments || []) {
         const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
-        if (t !== null && t > 2 && t < maxDistance) return true;
+        if (t !== null && t > SAME_DONG_INTERNAL_RAY_EPS_M && t < maxDistance) return true;
       }
       return false;
     }
 
     function rayBlockerProfile(origin, bearing, maxDistance, sourceFootprint) {
+      // 같은 동 내부: 유닛 사이 최근접 연결 외피 또는 같은 동의 다른 유닛 경계선을 만나면 내부 관통으로 제외한다.
       let internalBlocked = rayHitsSameDongCoreBridge(origin, bearing, maxDistance, sourceFootprint);
       const hits = [];
+      const checkedBarrierGroups = new Set();
 
       for (const footprint of footprints) {
         if (String(footprint.fid) === String(sourceFootprint.fid)) continue;
-        for (const segment of footprint.segments) {
-          const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
-          if (isSameDongFootprint(footprint, sourceFootprint)) {
-            if (t !== null && t > 2 && t < maxDistance) {
-              internalBlocked = true;
-            }
-            continue;
-          }
 
+        if (isSameDongFootprint(footprint, sourceFootprint)) {
+          for (const segment of footprint.segments || []) {
+            const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
+            if (t !== null && t > SAME_DONG_INTERNAL_RAY_EPS_M && t < maxDistance) {
+              internalBlocked = true;
+              break;
+            }
+          }
+          continue;
+        }
+
+        // 다른 동은 개별 유닛 경계뿐 아니라 같은동 보정 외피 전체를 차폐체로 사용한다.
+        // 같은 동 그룹에 속한 여러 유닛이 같은 외피를 공유하므로 groupKey 기준으로 한 번만 검사한다.
+        const groupKey = footprint.groupKey || `${footprint.zoneName}:${footprint.dong || ""}`;
+        if (checkedBarrierGroups.has(groupKey)) continue;
+        checkedBarrierGroups.add(groupKey);
+
+        for (const segment of footprint.groupBarrierSegments || footprint.segments || []) {
+          const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
           if (t === null || t <= 2 || t >= maxDistance) continue;
 
           hits.push({
@@ -1584,7 +1646,9 @@
       };
       if (pointInRing(testPoint, footprint.ring)) return false;
 
-      return distanceToSegments(samplePoint, footprint.groupExteriorSegments) <= EXTERIOR_HULL_TOLERANCE_M;
+      // 선택 유닛의 조망각은 실제 유닛 외곽선에서 출발한다.
+      // 단, 같은 동 보정 외피와 동떨어진 내부 경계/코어 방향 선은 조망 후보에서 제외한다.
+      return distanceToSegments(samplePoint, footprint.groupBarrierSegments || footprint.groupExteriorSegments) <= EXTERIOR_HULL_TOLERANCE_M;
     }
 
     function addRayToCollections(ray, openByDirection, openRaysByDirection, allOpenRays) {
@@ -2462,6 +2526,27 @@
       const floorView = data.view;
       const facadeColor = Cesium.Color.fromCssColorString("#16a34a").withAlpha(0.98);
       const rayColor = Cesium.Color.fromCssColorString("#0ea5e9").withAlpha(0.38);
+      const bridgeColor = Cesium.Color.fromCssColorString("#f97316").withAlpha(0.95);
+
+      for (const segment of data.footprint.groupCoreBridgeSegments || []) {
+        const a = xyToLonLat(segment.a);
+        const b = xyToLonLat(segment.b);
+        selectedSightEntities.push(viewer.entities.add({
+          name: `${entity.name} 같은동 차폐 외피 보정선`,
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+              a.lon, a.lat, baseHeight + 1.2,
+              b.lon, b.lat, baseHeight + 1.2
+            ]),
+            width: 4,
+            material: new Cesium.PolylineDashMaterialProperty({
+              color: bridgeColor,
+              dashLength: 12
+            }),
+            clampToGround: false
+          }
+        }));
+      }
 
       for (const ray of displayRaysForFloorView(floorView)) {
         const origin = xyToLonLat(ray.origin);
