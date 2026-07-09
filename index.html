@@ -2981,6 +2981,32 @@
       setStatus(`${prefix}\n유닛 수: ${validCount}\n최대 높이: ${maxHeight.toFixed(1)} m\n${riverStatusText()}`);
     }
 
+    function applyZone4DongFloorSwap(geojson, sourceUrl = "") {
+      if (!geojson || !Array.isArray(geojson.features)) return geojson;
+      const sourceText = String(sourceUrl || geojson.__sourceUrl || "");
+      const isZone4 = /apgujeong_4_units\.geojson/i.test(sourceText) || String(geojson.name || "") === "apgujeong_4_units";
+      if (!isZone4) return geojson;
+
+      for (const feature of geojson.features) {
+        const props = feature.properties || {};
+        const dong = String(props.dong || "").trim();
+        if (dong === "102") {
+          props.floors = 49;
+          props.floor_h = 3.692;
+          props.height_m = 188.91;
+          delete props.height_basis;
+          delete props.floor_h_note;
+        } else if (dong === "103") {
+          props.floors = 68;
+          props.floor_h = 3.558823529;
+          props.height_m = 250.0;
+          props.height_basis = "total_250m_for_68f";
+          props.floor_h_note = "floor_h adjusted so floors*floor_h+piloti_m equals 250m total height";
+        }
+      }
+      return geojson;
+    }
+
     async function fetchGeoJson(url) {
       const urls = Array.isArray(url) ? url : [url];
       const errors = [];
@@ -2991,7 +3017,7 @@
           if (!response.ok) throw new Error(`${candidate}: HTTP ${response.status}`);
           const data = await response.json();
           data.__sourceUrl = candidate;
-          return data;
+          return applyZone4DongFloorSwap(data, candidate);
         } catch (error) {
           errors.push(error.message);
         }
