@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>압구정 조망후보 지도</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#fff}
+    #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;color:#334155;background:#fff;z-index:9999}
+  </style>
+</head>
+<body>
+<div id="loading">조망후보 지도를 불러오는 중입니다…</div>
+<script>
+(async () => {
+  const params = new URLSearchParams(location.search);
+  const encoded = params.get('cfg') || '';
+  let config = null;
+  try {
+    const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    const bytes = Uint8Array.from(atob(padded), c => c.charCodeAt(0));
+    config = JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    document.getElementById('loading').textContent = '후보 지도 설정을 읽지 못했습니다: ' + error.message;
+    return;
+  }
+
+  try {
+    const response = await fetch('./index.html?v=' + Date.now(), {cache:'no-store'});
+    if (!response.ok) throw new Error('index.html HTTP ' + response.status);
+    let html = await response.text();
+    const configJson = JSON.stringify(config).replace(/<\//g, '<\\/');
+    const setup = `<script>window.APJ_VIEW_CANDIDATE_CONFIG=${configJson};<\/script>`;
+    const adapter = `<script>
+(function(){
+  const cfg = window.APJ_VIEW_CANDIDATE_CONFIG;
+  if(!cfg || !cfg.enabled) return;
+  const entryMap = new Map((cfg.entries||[]).map(e=>[String(e.fid),e]));
+  let appliedSource = null;
+  let loadingRequested = false;
+
+  function valueOf(prop){
+    try{return prop && typeof prop.getValue==='function' ? prop.getValue(Cesium.JulianDate.now()) : prop;}catch(e){return prop;}
+  }
+  function fidOf(entity){
+    if(entity && entity.fidValue!=null) return String(entity.fidValue);
+    const p=entity && entity.properties;
+    const fid=p && valueOf(p.fid);
+    const sourceFid=p && valueOf(p.source_fid);
+    const zone=p && (valueOf(p.source_zone)||valueOf(p.zone));
+    const candidates=[fid, sourceFid, zone!=null&&sourceFid!=null ? String(zone)+'-'+String(sourceFid) : null];
+    for(const v of candidates){if(v!=null && entryMap.has(String(v))) return String(v);}
+    return fid==null?'':String(fid);
+  }
+  function entryFor(entity){
+    const key=fidOf(entity);
+    if(entryMap.has(key)) return entryMap.get(key);
+    const p=entity && entity.properties;
+    const sourceFid=p && valueOf(p.source_fid);
+    const zone=p && (valueOf(p.source_zone)||valueOf(p.zone));
+    for(const e of cfg.entries||[]){
+      const ef=String(e.fid);
+      if(sourceFid!=null && (ef===String(sourceFid)||ef===String(zone)+'-'+String(sourceFid))) return e;
+    }
+    return null;
+  }
+  function clearCandidateLabels(){
+    if(!window.__apjCandidateLabels) window.__apjCandidateLabels=[];
+    while(window.__apjCandidateLabels.length){
+      try{viewer.entities.remove(window.__apjCandidateLabels.pop());}catch(e){break;}
+    }
+  }
+  function apply(){
+    if(typeof viewer==='undefined' || typeof unitsDataSource==='undefined' || !unitsDataSource) return false;
+    if(appliedSource===unitsDataSource) return true;
+    appliedSource=unitsDataSource;
+    clearCandidateLabels();
+    const matched=[];
+    for(const entity of unitsDataSource.entities.values){
+      if(!entity.polygon) continue;
+      const entry=entryFor(entity);
+      entity.show=true;
+      entity.polygon.show=true;
+      if(entry){
+        matched.push(entity);
+        const base=entity.baseColor || Cesium.Color.fromCssColorString('#f97316');
+        entity.polygon.material=base.withAlpha(1.0);
+        entity.polygon.outline=true;
+        entity.polygon.outlineColor=Cesium.Color.BLACK;
+        const pos=entity.positionForSight;
+        if(pos && pos.xy && typeof xyToLonLat==='function'){
+          const ll=xyToLonLat(pos.xy);
+          const h=Math.max(35,Number(pos.height||80)+18);
+          const label=viewer.entities.add({
+            position:Cesium.Cartesian3.fromDegrees(ll.lon,ll.lat,h),
+            label:{
+              text:String(entry.pyeong||entry.unitType||'후보')+'\n배정확률 '+Number(entry.probability||0).toFixed(1)+'%',
+              font:'700 15px sans-serif',
+              fillColor:Cesium.Color.fromCssColorString('#9a3412'),
+              showBackground:true,
+              backgroundColor:Cesium.Color.fromCssColorString('#fff7ed').withAlpha(0.92),
+              backgroundPadding:new Cesium.Cartesian2(7,5),
+              pixelOffset:new Cesium.Cartesian2(0,-12),
+              disableDepthTestDistance:Number.POSITIVE_INFINITY
+            }
+          });
+          window.__apjCandidateLabels.push(label);
+        }
+      }else{
+        const base=entity.baseColor || Cesium.Color.GRAY;
+        entity.polygon.material=base.withAlpha(0.10);
+      }
+    }
+    if(typeof mapMainTitleEl!=='undefined' && mapMainTitleEl) mapMainTitleEl.textContent=cfg.title||'조망후보';
+    if(typeof candidateSummaryEl!=='undefined' && candidateSummaryEl){
+      const groups={};
+      for(const e of cfg.entries||[]){const k=e.pyeong||e.unitType||'후보';groups[k]=(groups[k]||0)+1;}
+      candidateSummaryEl.innerHTML=Object.entries(groups).map(([k,n])=>'<b>'+k+'</b> 유닛 '+n+'개 · 각 '+(100/n).toFixed(1)+'%').join('<br>');
+      candidateSummaryEl.hidden=false;
+    }
+    if(matched.length){
+      const best=matched.find(e=>String(fidOf(e))===String(cfg.bestFid))||matched[0];
+      setTimeout(()=>{try{viewer.selectedEntity=best;}catch(e){}},300);
+    }
+    try{viewer.scene.requestRender();}catch(e){}
+    return true;
+  }
+  function ensureZone(){
+    if(loadingRequested) return;
+    if(typeof loadZone==='function' && cfg.zoneId){
+      loadingRequested=true;
+      Promise.resolve(loadZone(String(cfg.zoneId))).finally(()=>{loadingRequested=false;appliedSource=null;});
+    }
+  }
+  ensureZone();
+  const timer=setInterval(()=>{try{if(apply()) clearInterval(timer);}catch(e){console.error('candidate adapter',e);}},250);
+  setTimeout(()=>clearInterval(timer),20000);
+})();
+<\/script>`;
+    html = html.replace('</head>', setup + '\n</head>');
+    html = html.replace('</body>', adapter + '\n</body>');
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (error) {
+    document.getElementById('loading').textContent = '지도를 불러오지 못했습니다: ' + error.message;
+  }
+})();
+</script>
+</body>
+</html>
