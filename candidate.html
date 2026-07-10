@@ -150,16 +150,16 @@
       entity.show=true;
       entity.polygon.show=true;
       if(entity.label) entity.label.show=false;
+      const base=entity.baseColor||Cesium.Color.GRAY;
+      entity.polygon.material=base.withAlpha(1.0);
+      entity.polygon.outline=true;
+      entity.polygon.outlineColor=Cesium.Color.BLACK;
       if(entry){
         matched.push(entity);
-        const base=entity.baseColor||Cesium.Color.fromCssColorString('#f97316');
-        entity.polygon.material=isBest
-          ? Cesium.Color.fromCssColorString('#ffe600').withAlpha(1.0)
-          : base.withAlpha(1.0);
-        entity.polygon.outline=true;
-        entity.polygon.outlineColor=isBest
-          ? Cesium.Color.fromCssColorString('#00ff66')
-          : Cesium.Color.BLACK;
+        if(isBest){
+          entity.polygon.material=Cesium.Color.fromCssColorString('#ffe600').withAlpha(1.0);
+          entity.polygon.outlineColor=Cesium.Color.fromCssColorString('#00ff66');
+        }
         const pos=entity.positionForSight;
         if(pos&&pos.xy&&typeof xyToLonLat==='function'){
           const ll=xyToLonLat(pos.xy);
@@ -186,9 +186,6 @@
           });
           window.__apjCandidateLabels.push(label);
         }
-      }else{
-        const base=entity.baseColor||Cesium.Color.GRAY;
-        entity.polygon.material=base.withAlpha(0.10);
       }
     }
     if(typeof mapMainTitleEl!=='undefined'&&mapMainTitleEl) mapMainTitleEl.textContent=cfg.title||'조망후보';
