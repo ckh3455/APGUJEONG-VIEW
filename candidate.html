@@ -138,28 +138,43 @@
     for(const entity of unitsDataSource.entities.values){
       if(!entity.polygon) continue;
       const entry=entryFor(entity);
+      const entityFid=String(fidOf(entity));
+      const isBest=entry && entityFid===String(cfg.bestFid);
       entity.show=true;
       entity.polygon.show=true;
       if(entry){
         matched.push(entity);
         const base=entity.baseColor||Cesium.Color.fromCssColorString('#f97316');
-        entity.polygon.material=base.withAlpha(1.0);
+        entity.polygon.material=isBest
+          ? Cesium.Color.fromCssColorString('#ffe600').withAlpha(1.0)
+          : base.withAlpha(1.0);
         entity.polygon.outline=true;
-        entity.polygon.outlineColor=Cesium.Color.BLACK;
+        entity.polygon.outlineColor=isBest
+          ? Cesium.Color.fromCssColorString('#00ff66')
+          : Cesium.Color.BLACK;
         const pos=entity.positionForSight;
         if(pos&&pos.xy&&typeof xyToLonLat==='function'){
           const ll=xyToLonLat(pos.xy);
-          const h=Math.max(35,Number(pos.height||80)+18);
+          const h=Math.max(35,Number(pos.height||80)+(isBest?30:18));
+          const labelText=(isBest?'★ 최선 후보\n':'')+
+            String(entry.pyeong||entry.unitType||'후보')+'\n배정확률 '+Number(entry.probability||0).toFixed(1)+'%';
           const label=viewer.entities.add({
             position:Cesium.Cartesian3.fromDegrees(ll.lon,ll.lat,h),
             label:{
-              text:String(entry.pyeong||entry.unitType||'후보')+'\n배정확률 '+Number(entry.probability||0).toFixed(1)+'%',
-              font:'700 15px sans-serif',
-              fillColor:Cesium.Color.fromCssColorString('#9a3412'),
+              text:labelText,
+              font:isBest?'900 20px sans-serif':'700 15px sans-serif',
+              fillColor:isBest
+                ? Cesium.Color.fromCssColorString('#111827')
+                : Cesium.Color.fromCssColorString('#9a3412'),
+              outlineColor:isBest?Cesium.Color.WHITE:Cesium.Color.TRANSPARENT,
+              outlineWidth:isBest?3:0,
+              style:isBest?Cesium.LabelStyle.FILL_AND_OUTLINE:Cesium.LabelStyle.FILL,
               showBackground:true,
-              backgroundColor:Cesium.Color.fromCssColorString('#fff7ed').withAlpha(0.92),
-              backgroundPadding:new Cesium.Cartesian2(7,5),
-              pixelOffset:new Cesium.Cartesian2(0,-12),
+              backgroundColor:isBest
+                ? Cesium.Color.fromCssColorString('#ffe600').withAlpha(0.96)
+                : Cesium.Color.fromCssColorString('#fff7ed').withAlpha(0.92),
+              backgroundPadding:new Cesium.Cartesian2(isBest?10:7,isBest?8:5),
+              pixelOffset:new Cesium.Cartesian2(0,isBest?-20:-12),
               disableDepthTestDistance:Number.POSITIVE_INFINITY
             }
           });
