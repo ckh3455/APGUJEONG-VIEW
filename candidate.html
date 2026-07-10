@@ -32,6 +32,17 @@
     let html = await response.text();
     const configJson = JSON.stringify(config).replace(/<\//g, '<\\/');
     const setup = `<script>window.APJ_VIEW_CANDIDATE_CONFIG=${configJson};<\/script>`;
+    const candidateStyle = `<style>
+      .panel{
+        transform:scale(.5) !important;
+        transform-origin:top left !important;
+        width:500px !important;
+        max-width:none !important;
+        max-height:none !important;
+        overflow:visible !important;
+      }
+      #resetInitialView{background:#475569 !important;}
+    </style>`;
     const adapter = `<script>
 (function(){
   const cfg = window.APJ_VIEW_CANDIDATE_CONFIG;
@@ -39,6 +50,7 @@
   const entryMap = new Map((cfg.entries||[]).map(e=>[String(e.fid),e]));
   let appliedSource = null;
   let loadingRequested = false;
+  let initialViewApplied = false;
 
   function valueOf(prop){
     try{return prop && typeof prop.getValue==='function' ? prop.getValue(Cesium.JulianDate.now()) : prop;}catch(e){return prop;}
@@ -71,11 +83,40 @@
       try{viewer.entities.remove(window.__apjCandidateLabels.pop());}catch(e){break;}
     }
   }
+  function resetInitialView(){
+    try{
+      if(typeof stopAutoRotate==='function') stopAutoRotate();
+      viewer.selectedEntity=undefined;
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      viewer.camera.setView({
+        destination:Cesium.Cartesian3.fromDegrees(127.03255,37.52545,1450),
+        orientation:{
+          heading:Cesium.Math.toRadians(335),
+          pitch:Cesium.Math.toRadians(-50),
+          roll:0
+        }
+      });
+      viewer.scene.requestRender();
+    }catch(e){console.error('reset initial view',e);}
+  }
+  function addResetButton(){
+    if(document.getElementById('resetInitialView')) return;
+    const stop=document.getElementById('stopRotate');
+    if(!stop || !stop.parentElement) return;
+    const button=document.createElement('button');
+    button.id='resetInitialView';
+    button.type='button';
+    button.className='secondary';
+    button.textContent='초기지도복귀';
+    button.addEventListener('click',resetInitialView);
+    stop.insertAdjacentElement('afterend',button);
+  }
   function apply(){
     if(typeof viewer==='undefined' || typeof unitsDataSource==='undefined' || !unitsDataSource) return false;
     if(appliedSource===unitsDataSource) return true;
     appliedSource=unitsDataSource;
     clearCandidateLabels();
+    addResetButton();
     const matched=[];
     for(const entity of unitsDataSource.entities.values){
       if(!entity.polygon) continue;
@@ -123,6 +164,10 @@
       const best=matched.find(e=>String(fidOf(e))===String(cfg.bestFid))||matched[0];
       setTimeout(()=>{try{viewer.selectedEntity=best;}catch(e){}},300);
     }
+    if(!initialViewApplied){
+      initialViewApplied=true;
+      setTimeout(resetInitialView,700);
+    }
     try{viewer.scene.requestRender();}catch(e){}
     return true;
   }
@@ -133,12 +178,13 @@
       Promise.resolve(loadZone(String(cfg.zoneId))).finally(()=>{loadingRequested=false;appliedSource=null;});
     }
   }
+  addResetButton();
   ensureZone();
-  const timer=setInterval(()=>{try{if(apply()) clearInterval(timer);}catch(e){console.error('candidate adapter',e);}},250);
+  const timer=setInterval(()=>{try{addResetButton();if(apply()) clearInterval(timer);}catch(e){console.error('candidate adapter',e);}},250);
   setTimeout(()=>clearInterval(timer),20000);
 })();
 <\/script>`;
-    html = html.replace('</head>', setup + '\n</head>');
+    html = html.replace('</head>', setup + '\n' + candidateStyle + '\n</head>');
     html = html.replace('</body>', adapter + '\n</body>');
     document.open();
     document.write(html);
