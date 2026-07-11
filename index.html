@@ -12,16 +12,660 @@
   </style>
 </head>
 <body>
-  <div id="bootMessage">압구정 조망 시뮬레이션 v48을 불러오는 중입니다.</div>
+  <div id="bootMessage">압구정 조망 시뮬레이션 v49를 불러오는 중입니다.</div>
+
+  <script type="text/plain" id="updateRiverModeNotePatch">
+    function updateRiverModeNote() {
+      if (!riverModeNoteEl) return;
+      if (currentZoneId === "ALL") {
+        riverModeNoteEl.textContent = "구역 선택 대기 · 2~5구역 중 하나를 선택하면 해당 구역만 계산합니다.";
+        return;
+      }
+      riverModeNoteEl.textContent = riverModesReady
+        ? `현재 구역 계산 완료 · 공통 레이 1회 계산 · 현재 기준: ${activeRiverConfig().label}`
+        : `현재 구역 공통 레이 계산 중 · 현재 기준: ${activeRiverConfig().label}`;
+    }
+  </script>
+
+  <script type="text/plain" id="resetCachePatch">
+    function resetViewAnalysisCache() {
+      viewAnalysisByFid.clear();
+      calculatedZones.clear();
+      calculatingZonePromises.clear();
+      zoneCalculationQueue = Promise.resolve();
+      viewAnalysisCacheByMode.clear();
+      sharedCandidateDataByFid.clear();
+    }
+  </script>
+
+  <script type="text/plain" id="candidatePatch">
+    function optimizedCommonRiverContexts() {
+      const contexts = [];
+      const zoneIds = currentLoadedZoneIds();
+      for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+        const state = preparedRiverStateByMode.get(mode) || preparedRiverState(mode, zoneIds);
+        if (!state || !state.context || !state.context.segments || !state.context.segments.length) continue;
+        contexts.push({ mode, context: state.context });
+      }
+      return contexts;
+    }
+
+    function optimizedCommonRiverPoints(contexts) {
+      const points = [];
+      const seen = new Set();
+      for (const item of contexts || []) {
+        for (const point of item.context.points || []) {
+          const key = `${Math.round(point.x * 10)}:${Math.round(point.y * 10)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          points.push(point);
+        }
+      }
+      return points;
+    }
+
+    function optimizedAngularScan(origin, scanPoints) {
+      const bearings = (scanPoints || [])
+        .map(point => bearingTo(origin, point))
+        .filter(value => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!bearings.length) return { angles: [], targetSpan: 0 };
+      if (bearings.length === 1) {
+        const angle = normalizeAngle(Math.round(bearings[0]));
+        return { angles: [angle], targetSpan: 1 };
+      }
+
+      let largestGap = -1;
+      let gapIndex = 0;
+      for (let i = 0; i < bearings.length; i += 1) {
+        const current = bearings[i];
+        const next = bearings[(i + 1) % bearings.length] + (i === bearings.length - 1 ? 360 : 0);
+        const gap = next - current;
+        if (gap > largestGap) {
+          largestGap = gap;
+          gapIndex = i;
+        }
+      }
+
+      const start = bearings[(gapIndex + 1) % bearings.length];
+      const span = Math.max(0, 360 - largestGap);
+      const angles = [];
+      const seen = new Set();
+      for (let offset = 0; offset <= span; offset += 1) {
+        const angle = normalizeAngle(Math.round(start + offset));
+        if (seen.has(angle)) continue;
+        seen.add(angle);
+        angles.push(angle);
+      }
+      return { angles, targetSpan: Math.round(span) };
+    }
+
+    function buildOptimizedBlockerGroups(allFootprints) {
+      const groups = new Map();
+      for (const footprint of allFootprints || []) {
+        const key = footprint.groupKey || `${footprint.zoneName}:${footprint.dong || ""}`;
+        let group = groups.get(key);
+        if (!group) {
+          group = {
+            key,
+            zoneName: footprint.zoneName,
+            dong: footprint.dong,
+            unitType: footprint.unitType,
+            members: [],
+            barrierSegments: footprint.groupBarrierSegments || footprint.segments || [],
+            height: 0,
+            floors: 0
+          };
+          groups.set(key, group);
+        }
+        group.members.push(footprint);
+        group.height = Math.max(group.height, blockerOcclusionHeight(footprint));
+        group.floors = Math.max(group.floors, blockerOcclusionFloors(footprint));
+      }
+      return groups;
+    }
+
+    function nearestIntersectionDistance(origin, bearing, segments, maxDistance) {
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const segment of segments || []) {
+        const t = raySegmentDistance(origin, bearing, segment.a, segment.b);
+        if (t === null || t <= SAME_DONG_INTERNAL_RAY_EPS_M || t >= maxDistance) continue;
+        if (t < nearest) nearest = t;
+      }
+      return nearest;
+    }
+
+    function collectOptimizedObstacleEvents(origin, bearing, maxDistance, sourceFootprint, blockerGroups) {
+      let internalBlockDistance = Number.POSITIVE_INFINITY;
+      internalBlockDistance = Math.min(
+        internalBlockDistance,
+        nearestIntersectionDistance(origin, bearing, sourceFootprint.groupCoreBridgeSegments || [], maxDistance)
+      );
+
+      const sourceGroup = blockerGroups.get(sourceFootprint.groupKey);
+      if (sourceGroup) {
+        for (const member of sourceGroup.members) {
+          if (String(member.fid) === String(sourceFootprint.fid)) continue;
+          internalBlockDistance = Math.min(
+            internalBlockDistance,
+            nearestIntersectionDistance(origin, bearing, member.segments || [], maxDistance)
+          );
+        }
+      }
+
+      const hits = [];
+      for (const group of blockerGroups.values()) {
+        if (group.key === sourceFootprint.groupKey) continue;
+        const t = nearestIntersectionDistance(origin, bearing, group.barrierSegments, maxDistance);
+        if (!Number.isFinite(t)) continue;
+        hits.push({
+          zoneName: group.zoneName,
+          dong: group.dong,
+          unitType: group.unitType,
+          distance: t,
+          height: group.height,
+          floors: group.floors
+        });
+      }
+      hits.sort((a, b) => a.distance - b.distance);
+      return { internalBlockDistance, hits };
+    }
+
+    function blockerProfileFromOptimizedEvents(obstacleEvents, maxDistance) {
+      const filtered = (obstacleEvents.hits || [])
+        .filter(hit => hit.distance < maxDistance)
+        .sort((a, b) => a.distance - b.distance);
+      let maxBlockerHeight = 0;
+      const blockers = [];
+      for (const hit of filtered) {
+        if (hit.height > maxBlockerHeight) {
+          maxBlockerHeight = hit.height;
+          blockers.push(hit);
+        }
+      }
+      return { maxBlockerHeight, blockers };
+    }
+
+    function collectSharedFacadeCandidates(footprint, contexts, blockerGroups, commonPoints) {
+      const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
+      const rays = [];
+
+      for (const sample of samples) {
+        const scan = optimizedAngularScan(sample.point, commonPoints);
+        for (const angle of scan.angles) {
+          const hitsByMode = {};
+          let maxDistance = 0;
+          for (const item of contexts) {
+            const hit = nearestRayHit(sample.point, angle, item.context.segments);
+            if (!hit || !Number.isFinite(hit.distance) || hit.distance <= 2) continue;
+            hitsByMode[item.mode] = hit.distance;
+            maxDistance = Math.max(maxDistance, hit.distance);
+          }
+          if (!maxDistance) continue;
+
+          const rad = Cesium.Math.toRadians(angle);
+          const farTarget = {
+            x: sample.point.x + Math.sin(rad) * maxDistance,
+            y: sample.point.y + Math.cos(rad) * maxDistance
+          };
+          if (!viewRayLeavesBuilding(sample.point, farTarget, footprint)) continue;
+
+          const obstacleEvents = collectOptimizedObstacleEvents(
+            sample.point,
+            angle,
+            maxDistance,
+            footprint,
+            blockerGroups
+          );
+          rays.push({ angle, origin: sample.point, sample, hitsByMode, obstacleEvents });
+        }
+      }
+
+      return { samples, rays, modeData: new Map() };
+    }
+
+    function candidateDataForMode(sharedData, mode) {
+      if (sharedData.modeData.has(mode)) return sharedData.modeData.get(mode);
+      const candidates = [];
+      const blockerMap = new Map();
+
+      for (const ray of sharedData.rays) {
+        const modeDistance = Number(ray.hitsByMode[mode]);
+        if (!Number.isFinite(modeDistance) || modeDistance <= 2) continue;
+        if (ray.obstacleEvents.internalBlockDistance < modeDistance) continue;
+
+        const profile = blockerProfileFromOptimizedEvents(ray.obstacleEvents, modeDistance);
+        for (const blocker of profile.blockers) {
+          const key = `${blocker.zoneName || ""}:${blocker.dong || ""}`;
+          const current = blockerMap.get(key);
+          if (!current || blocker.distance < current.distance) blockerMap.set(key, blocker);
+        }
+
+        const rad = Cesium.Math.toRadians(ray.angle);
+        const end = {
+          x: ray.origin.x + Math.sin(rad) * modeDistance,
+          y: ray.origin.y + Math.cos(rad) * modeDistance
+        };
+        candidates.push({
+          angle: ray.angle,
+          distance: modeDistance,
+          origin: ray.origin,
+          end,
+          blockerHeight: profile.maxBlockerHeight,
+          blockers: profile.blockers,
+          sample: ray.sample
+        });
+      }
+
+      const result = {
+        samples: sharedData.samples,
+        candidates,
+        angleProfiles: buildAngleProfiles(candidates),
+        blockers: [...blockerMap.values()].sort((a, b) => a.distance - b.distance)
+      };
+      sharedData.modeData.set(mode, result);
+      return result;
+    }
+
+    function collectFacadeCandidates(footprint) {
+      const contexts = optimizedCommonRiverContexts();
+      const commonPoints = optimizedCommonRiverPoints(contexts);
+      const blockerGroups = buildOptimizedBlockerGroups(footprints);
+      const sharedData = collectSharedFacadeCandidates(footprint, contexts, blockerGroups, commonPoints);
+      return candidateDataForMode(sharedData, currentRiverMode);
+    }
+  </script>
+
+  <script type="text/plain" id="floorBandsPatch">
+    function buildFloorBands(footprint, candidateData, summaryCache = null) {
+      const floorCount = Math.max(1, Math.round(footprint.floors || 1));
+      const cache = summaryCache || new Map();
+      const summaryForFloor = floor => {
+        if (cache.has(floor)) return cache.get(floor);
+        const summary = summarizeFacadeCandidates(footprint, candidateData, floorEyeHeight(footprint, floor));
+        cache.set(floor, summary);
+        return summary;
+      };
+
+      const bands = [];
+      let previous = null;
+      for (let floor = 1; floor <= floorCount; floor += 1) {
+        const summary = summaryForFloor(floor);
+        const comparable = { totalOpen: summary.totalOpen };
+        if (!previous) {
+          previous = { start: floor, end: floor, comparable, summary };
+          continue;
+        }
+        if (comparable.totalOpen === previous.comparable.totalOpen) {
+          previous.end = floor;
+        } else {
+          bands.push(previous);
+          previous = {
+            start: floor,
+            end: floor,
+            comparable,
+            summary,
+            transitionCause: explainFloorTransition(candidateData, previous.summary, summary, floor)
+          };
+        }
+      }
+      if (previous) bands.push(previous);
+      return bands;
+    }
+  </script>
+
+  <script type="text/plain" id="analysisPatch">
+    function optimizedAnalysisForMode(footprint, candidateData, context) {
+      const closest = closestPointOnPolyline(footprint.center, context.segments);
+      const direction = closest ? bearingTo(footprint.center, closest.point) : null;
+      const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
+      const facadeView = summarizeFacadeCandidates(
+        footprint,
+        candidateData,
+        floorEyeHeight(footprint, displayFloor)
+      );
+      const floorViewCache = new Map([[displayFloor, facadeView]]);
+      const totalOpen = facadeView.totalOpen;
+      const grade = totalOpen >= 60 ? "전면 조망" :
+        totalOpen >= 30 ? "양호한 부분 조망" :
+        totalOpen >= 10 ? "틈새 조망" :
+        facadeView.visibleFacadeLength > 0 ? "제한적 조망" : "차폐";
+
+      return {
+        riverDistance: closest ? closest.distance : null,
+        riverBearing: direction,
+        riverBearingName: direction === null ? "" : bearingName(direction),
+        targetSpan: facadeView.targetSpan,
+        openByDirection: facadeView.openByDirection,
+        openRaysByDirection: facadeView.openRaysByDirection,
+        allOpenSummary: facadeView.allOpenSummary,
+        allOpenRays: facadeView.allOpenRays,
+        totalOpen,
+        visibleFacadeLength: facadeView.visibleFacadeLength,
+        visibleFacadeSegments: facadeView.visibleFacadeSegments,
+        visibleSampleCount: facadeView.visibleSampleCount,
+        sampleCount: facadeView.sampleCount,
+        candidateData,
+        floorBands: null,
+        floorViewCache,
+        displayFloor,
+        displayEyeHeight: facadeView.observerHeight,
+        blockers: facadeView.blockers.slice(0, 3),
+        grade
+      };
+    }
+
+    async function runOptimizedZoneAnalysis(zoneId, generation) {
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      const cacheKey = normalizedZoneId || "ALL";
+      if (cacheKey === "ALL") return;
+
+      await preloadRiverModeFiles();
+      if (generation !== optimizedCalculationGeneration) return;
+
+      const zoneIds = currentLoadedZoneIds();
+      const contexts = [];
+      for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+        const state = preparedRiverState(mode, zoneIds);
+        if (state && state.context) contexts.push({ mode, context: state.context });
+      }
+      const commonPoints = optimizedCommonRiverPoints(contexts);
+      const footprintSnapshot = footprints.slice();
+      const targets = footprintSnapshot.filter(fp => normalizeZoneId(fp.zoneName) === cacheKey);
+      const blockerGroups = buildOptimizedBlockerGroups(footprintSnapshot);
+      const modeAnalysisMaps = new Map(
+        Object.keys(RIVER_MODE_CONFIGS).map(mode => [mode, new Map()])
+      );
+
+      viewAnalysisCacheByMode.clear();
+      sharedCandidateDataByFid.clear();
+      const started = performance.now();
+      let completed = 0;
+      setStatus(`${zoneLabelForStatus(cacheKey)} 공통 레이 계산 중...\n유닛 폴리곤: 0/${targets.length}`);
+
+      for (const footprint of targets) {
+        if (generation !== optimizedCalculationGeneration) return;
+        const sharedData = collectSharedFacadeCandidates(
+          footprint,
+          contexts,
+          blockerGroups,
+          commonPoints
+        );
+        sharedCandidateDataByFid.set(String(footprint.fid), sharedData);
+
+        for (const item of contexts) {
+          const candidateData = candidateDataForMode(sharedData, item.mode);
+          const analysis = optimizedAnalysisForMode(footprint, candidateData, item.context);
+          modeAnalysisMaps.get(item.mode).set(String(footprint.fid), analysis);
+        }
+
+        completed += 1;
+        if (completed % 2 === 0 || completed === targets.length) {
+          const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+          setStatus(`${zoneLabelForStatus(cacheKey)} 공통 레이 계산 중...\n유닛 폴리곤: ${completed}/${targets.length}\n경과: ${elapsed}초`);
+          await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+      }
+
+      if (generation !== optimizedCalculationGeneration) return;
+      for (const [mode, analysis] of modeAnalysisMaps.entries()) {
+        viewAnalysisCacheByMode.set(mode, {
+          analysis,
+          calculatedZones: new Set([cacheKey])
+        });
+      }
+
+      activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+      restoreAnalysisCacheForMode(currentRiverMode);
+      riverModesReady = true;
+      setRiverModeButtonsDisabled(false);
+      updateRiverModeNote();
+      const seconds = ((performance.now() - started) / 1000).toFixed(1);
+      setStatus(`${zoneLabelForStatus(cacheKey)} 계산 완료\n공통 레이·차폐 계산: 1회\n보수적·완화적 결과 생성 완료\n유닛: ${targets.length}개 / 소요: ${seconds}초`);
+    }
+
+    function storeViewAnalysisForFootprint() {
+      return false;
+    }
+
+    function runZoneAnalysis(zoneId) {
+      return prepareBothRiverModeAnalyses(zoneId);
+    }
+
+    function analyzeViewsForZone(zoneId) {
+      return prepareBothRiverModeAnalyses(zoneId);
+    }
+  </script>
+
+  <script type="text/plain" id="preparePatch">
+    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {
+      if (zoneId === "ALL") return;
+      const generation = optimizedCalculationGeneration;
+      if (riverModesAnalysisPromise) {
+        if (optimizedAnalysisPromiseGeneration === generation) return riverModesAnalysisPromise;
+        try {
+          await riverModesAnalysisPromise;
+        } catch (_) {
+        }
+      }
+
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      optimizedAnalysisPromiseGeneration = generation;
+      const promise = runOptimizedZoneAnalysis(zoneId, generation);
+      riverModesAnalysisPromise = promise.finally(() => {
+        if (optimizedAnalysisPromiseGeneration === generation) {
+          riverModesAnalysisPromise = null;
+          optimizedAnalysisPromiseGeneration = -1;
+        }
+      });
+      return riverModesAnalysisPromise;
+    }
+  </script>
+
+  <script type="text/plain" id="floorViewPatch">
+    function summaryForAnalysisFloor(footprint, analysis, floor) {
+      if (!analysis.floorViewCache) analysis.floorViewCache = new Map();
+      if (analysis.floorViewCache.has(floor)) return analysis.floorViewCache.get(floor);
+      const summary = summarizeFacadeCandidates(
+        footprint,
+        analysis.candidateData,
+        floorEyeHeight(footprint, floor)
+      );
+      analysis.floorViewCache.set(floor, summary);
+      return summary;
+    }
+
+    function floorViewForEntity(entity, forcedFloor = null) {
+      const footprint = entity && entity.polygon
+        ? (entity.footprintForSight || footprints.find(f => String(f.fid) === String(entity.fidValue)))
+        : null;
+      if (!entity || !footprint || !entity.fidValue) return null;
+      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
+      if (!analysis || !analysis.candidateData) return null;
+      const floor = forcedFloor || selectedFloorForEntity(entity, footprint);
+      if (!floor) return null;
+      return {
+        floor,
+        footprint,
+        analysis,
+        view: summaryForAnalysisFloor(footprint, analysis, floor)
+      };
+    }
+
+    function ensureFloorBandsForEntity(entity) {
+      if (!entity || !entity.fidValue) return false;
+      const footprint = entity.footprintForSight || footprints.find(f => String(f.fid) === String(entity.fidValue));
+      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
+      if (!footprint || !analysis || !analysis.candidateData) return false;
+      if (analysis.floorBands) return false;
+      if (!analysis.floorViewCache) analysis.floorViewCache = new Map();
+      analysis.floorBands = buildFloorBands(footprint, analysis.candidateData, analysis.floorViewCache);
+      return true;
+    }
+  </script>
+
+  <script type="text/plain" id="switchAndRecalcPatch">
+    async function switchRiverMode(mode) {
+      if (!RIVER_MODE_CONFIGS[mode]) return;
+      if (currentZoneId === "ALL") {
+        setStatus("먼저 2~5구역 중 하나를 선택하세요.");
+        return;
+      }
+      if (!riverModesReady && riverModesAnalysisPromise) {
+        setStatus(`${zoneLabelForStatus(currentZoneId)} 공통 레이 계산을 완료한 뒤 전환합니다.`);
+        await riverModesAnalysisPromise;
+      }
+      if (!riverModesReady || !viewAnalysisCacheByMode.has(mode)) {
+        setStatus("현재 구역의 계산 결과가 준비되지 않았습니다.");
+        return;
+      }
+      if (mode === currentRiverMode) {
+        setActiveRiverButton(mode);
+        updateRiverModeNote();
+        return;
+      }
+
+      const selectedEntity = viewer.selectedEntity;
+      try {
+        activatePreparedRiverMode(mode, { zoneIds: currentLoadedZoneIds(), draw: true });
+        restoreAnalysisCacheForMode(mode);
+        if (selectedEntity) {
+          ensureFloorBandsForEntity(selectedEntity);
+          drawSelectedSightLines(selectedEntity);
+          updateSelectionDetails(selectedEntity);
+        }
+        updateFloorTotalAngle(selectedEntity);
+        setStatus(`${activeRiverConfig().label} 저장 결과로 즉시 전환했습니다.`);
+      } catch (error) {
+        setStatus(`${activeRiverConfig().label} 전환 실패: ${error.message}`);
+      }
+    }
+
+    async function recalculateViews(message = "조망 계산 갱신 완료") {
+      if (currentZoneId === "ALL") {
+        setStatus("전체 화면에서는 조망 계산을 실행하지 않습니다. 2~5구역 중 하나를 선택하세요.");
+        return;
+      }
+      optimizedCalculationGeneration += 1;
+      preparedRiverStateByMode.clear();
+      resetViewAnalysisCache();
+      await prepareBothRiverModeAnalyses(currentZoneId);
+      setStatus(`${message}\n공통 레이 1회 방식으로 두 기준을 다시 계산했습니다.`);
+      if (viewer.selectedEntity) {
+        ensureFloorBandsForEntity(viewer.selectedEntity);
+        drawSelectedSightLines(viewer.selectedEntity);
+        updateSelectionDetails(viewer.selectedEntity);
+      }
+      updateFloorTotalAngle(viewer.selectedEntity);
+    }
+  </script>
+
+  <script type="text/plain" id="loadZonePatch">
+    async function loadZone(zoneId) {
+      const config = ZONE_CONFIGS[zoneId] || ZONE_CONFIGS["2"];
+      const generation = ++optimizedCalculationGeneration;
+      currentZoneId = zoneId;
+      setActiveZoneButton(zoneId);
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      setStatus(`${config.label} 데이터를 불러오는 중입니다.`);
+
+      try {
+        const zoneIds = config.zoneIds ? config.zoneIds.slice() : [zoneId];
+        const riverFilesPromise = preloadRiverModeFiles();
+        const unitsPromise = config.zoneIds
+          ? Promise.all(
+              zoneIds.map(async id => ({
+                zoneId: id,
+                data: await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)
+              }))
+            ).then(combineFeatureCollections)
+          : fetchGeoJson(config.unitsUrl).then(data =>
+              combineFeatureCollections([{ zoneId, data }])
+            );
+
+        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
+        if (generation !== optimizedCalculationGeneration) return;
+        preparedRiverStateByMode.clear();
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+        await loadGeoJson(unitsData, config.label);
+        if (generation !== optimizedCalculationGeneration) return;
+
+        if (zoneId === "ALL") {
+          riverModesReady = false;
+          setRiverModeButtonsDisabled(true);
+          updateRiverModeNote();
+          setStatus("지도 로드 완료\n전체 조망 계산은 시작하지 않았습니다.\n2~5구역 중 하나를 선택하면 해당 구역만 계산합니다.");
+          return;
+        }
+        await prepareBothRiverModeAnalyses(zoneId);
+      } catch (error) {
+        if (generation !== optimizedCalculationGeneration) return;
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus(`${config.label} 로드 실패: ${error.message}`);
+      }
+    }
+  </script>
+
+  <script type="text/plain" id="selectionPatch">
+    viewer.selectedEntityChanged.addEventListener(async (entity) => {
+      updateEyeFloorInput(entity);
+      clearSelectedSightLines();
+
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        if (lastPickedHeightScreenPosition) {
+          setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
+        } else {
+          updateSelectionDetails(null);
+        }
+        return;
+      }
+
+      showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
+      if (currentZoneId === "ALL") {
+        setStatus("먼저 2~5구역 중 하나를 선택하세요. 전체 화면에서는 조망 계산을 하지 않습니다.");
+        return;
+      }
+
+      if (!viewAnalysisByFid.has(String(entity.fidValue)) && riverModesAnalysisPromise) {
+        await riverModesAnalysisPromise;
+      }
+      if (viewer.selectedEntity !== entity) return;
+      if (!viewAnalysisByFid.has(String(entity.fidValue))) return;
+
+      ensureFloorBandsForEntity(entity);
+      drawSelectedSightLines(entity);
+      updateSelectionDetails(entity);
+      updateFloorTotalAngle(entity);
+    });
+  </script>
+
   <script>
     (() => {
-      const BASE_FILE = "./index_v44_base.html?v=20260711-48";
+      const BASE_FILE = "./index_v44_base.html?v=20260711-49";
       const message = document.getElementById("bootMessage");
 
       function replaceRequired(source, before, after, label) {
         const index = source.indexOf(before);
         if (index < 0) throw new Error(`${label} 수정 위치를 찾지 못했습니다.`);
         return source.slice(0, index) + after + source.slice(index + before.length);
+      }
+
+      function replaceBlock(source, startMarker, endMarker, replacement, label) {
+        const start = source.indexOf(startMarker);
+        const end = source.indexOf(endMarker, start + startMarker.length);
+        if (start < 0 || end < 0 || end <= start) throw new Error(`${label} 함수 범위를 찾지 못했습니다.`);
+        return source.slice(0, start) + replacement + "\n\n" + source.slice(end);
+      }
+
+      function patchText(id) {
+        return document.getElementById(id).textContent.replace(/^\n/, "").trimEnd();
       }
 
       async function boot() {
@@ -32,54 +676,82 @@
         source = replaceRequired(
           source,
           '<div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
-          '<div class="hint">버전: v48 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+          '<div class="hint">버전: v49 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
           "버전"
         );
         source = replaceRequired(
           source,
           'const DATA_VERSION = "v44-dual-river-preload-20260711";',
-          'const DATA_VERSION = "v48-zone-on-demand-20260711";',
+          'const DATA_VERSION = "v49-shared-ray-lazy-floor-20260711";',
           "데이터 버전"
         );
+        source = replaceRequired(
+          source,
+          '    let riverModesReady = false;',
+          '    let riverModesReady = false;\n    const sharedCandidateDataByFid = new Map();\n    let optimizedCalculationGeneration = 0;\n    let optimizedAnalysisPromiseGeneration = -1;',
+          "최적화 캐시 변수"
+        );
 
-        const loadOld = [
-          '        await loadGeoJson(unitsData, config.label);',
-          '        await prepareBothRiverModeAnalyses(zoneId);'
-        ].join("\n");
-        const loadNew = [
-          '        await loadGeoJson(unitsData, config.label);',
-          '        if (zoneId === "ALL") {',
-          '          riverModesReady = false;',
-          '          viewAnalysisCacheByMode.clear();',
-          '          setRiverModeButtonsDisabled(true);',
-          '          if (riverModeNoteEl) riverModeNoteEl.textContent = "구역 선택 대기 · 2~5구역 중 하나를 선택하면 해당 구역만 계산합니다.";',
-          '          setStatus("지도 로드 완료\\n전체 조망 계산은 시작하지 않았습니다.\\n2~5구역 중 하나를 선택하면 해당 구역의 보수적·완화적 결과를 함께 계산합니다.");',
-          '        } else {',
-          '          await prepareBothRiverModeAnalyses(zoneId);',
-          '        }'
-        ].join("\n");
-        source = replaceRequired(source, loadOld, loadNew, "전체 자동 계산 중지");
-
-        const entityOld = [
-          '      if (!viewAnalysisByFid.has(fid)) {',
-          '        setStatus(`${zoneLabelForStatus(zoneId)} 조망 계산을 시작합니다.`);',
-          '        await analyzeViewsForZone(zoneId);',
-          '      }'
-        ].join("\n");
-        const entityNew = [
-          '      if (!viewAnalysisByFid.has(fid)) {',
-          '        if (currentZoneId === "ALL") {',
-          '          setStatus("먼저 2~5구역 중 하나를 선택하세요.\\n전체 화면에서는 조망 계산을 시작하지 않습니다.");',
-          '          updateSelectionDetails(entity);',
-          '          updateFloorTotalAngle(entity);',
-          '          return;',
-          '        }',
-          '        setStatus(`${zoneLabelForStatus(zoneId)} 보수적·완화적 계산 완료를 기다리는 중입니다.`);',
-          '        if (riverModesAnalysisPromise) await riverModesAnalysisPromise;',
-          '        if (!viewAnalysisByFid.has(fid)) return;',
-          '      }'
-        ].join("\n");
-        source = replaceRequired(source, entityOld, entityNew, "유닛 클릭 재계산 방지");
+        source = replaceBlock(source,
+          "    function updateRiverModeNote() {",
+          "    function currentLoadedZoneIds() {",
+          patchText("updateRiverModeNotePatch"),
+          "한강라인 안내"
+        );
+        source = replaceBlock(source,
+          "    function resetViewAnalysisCache() {",
+          "    function zoneLabelForStatus",
+          patchText("resetCachePatch"),
+          "캐시 초기화"
+        );
+        source = replaceBlock(source,
+          "    function collectFacadeCandidates(footprint) {",
+          "    function summarizeFacadeCandidates",
+          patchText("candidatePatch"),
+          "공통 레이 후보"
+        );
+        source = replaceBlock(source,
+          "    function buildFloorBands(footprint, candidateData) {",
+          "    function clearSelectedSightLines",
+          patchText("floorBandsPatch"),
+          "층별 캐시"
+        );
+        source = replaceBlock(source,
+          "    function storeViewAnalysisForFootprint(footprint) {",
+          "    function clearOutlines",
+          patchText("analysisPatch"),
+          "공통 구역 계산"
+        );
+        source = replaceBlock(source,
+          "    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {",
+          "    function applyPublicBaseMap",
+          patchText("preparePatch"),
+          "두 기준 준비"
+        );
+        source = replaceBlock(source,
+          "    function floorViewForEntity(entity, forcedFloor = null) {",
+          "    function updateFloorTotalAngle",
+          patchText("floorViewPatch"),
+          "층수 표시 캐시"
+        );
+        source = replaceBlock(source,
+          "    async function switchRiverMode(mode) {",
+          "    async function loadGeoJson",
+          patchText("switchAndRecalcPatch"),
+          "모드 전환"
+        );
+        source = replaceBlock(source,
+          "    async function loadZone(zoneId) {",
+          "    function applyVworldBaseMap",
+          patchText("loadZonePatch"),
+          "구역 선택 계산"
+        );
+        source = replaceBlock(source,
+          "    viewer.selectedEntityChanged.addEventListener(async (entity) => {",
+          "    setActiveRiverButton(currentRiverMode);",
+          patchText("selectionPatch"),
+          "유닛 선택 지연 계산"
+        );
 
         document.open();
         document.write(source);
