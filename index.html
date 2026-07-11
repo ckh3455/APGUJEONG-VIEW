@@ -28,6 +28,8 @@
       top: 10px;
       left: 10px;
       width: 500px;
+      transform: scale(0.75);
+      transform-origin: top left;
       max-width: calc(100vw - 28px);
       padding: 8px;
       background: rgba(255, 255, 255, 0.94);
@@ -300,6 +302,7 @@
     }
     @media (max-width: 768px) {
       .panel {
+        transform: none;
         top: 8px;
         left: 8px;
         right: auto;
@@ -444,6 +447,7 @@
     }
     @media (max-width: 900px) and (orientation: landscape) {
       .panel {
+        transform: none;
         right: auto;
         width: 280px;
         max-height: calc(100svh - 24px);
@@ -495,6 +499,7 @@
       <span id="floorTotalAngle" class="floor-total-angle">유닛 선택</span>
       <button id="startEyeRotate" class="secondary">눈높이 360도</button>
       <button id="stopRotate" class="secondary">회전 정지</button>
+      <button id="resetInitialView" class="secondary">초기화면 복귀</button>
     </div>
     <div id="status" class="status" hidden></div>
     <div class="legend-detail-wrap">
@@ -520,7 +525,9 @@
   <script>
     Cesium.Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkYzAxNjVhNS04MjhiLTRmODctODA4Mi04NWMxMzE5OWY0N2QiLCJpZCI6NDUyNDQ0LCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3ODMxNzI4NzN9.mCqCGlQbTgG6EPdX5iGrhhyKi7TYcta1z6u9kPQE_V0";
 
-    const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 720);
+    const INITIAL_VIEW_HEIGHT = 1050;
+    const INITIAL_VIEW_RANGE = 1250;
+    const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, INITIAL_VIEW_HEIGHT);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
     const DATA_VERSION = "v41-same-dong-envelope-20260709";
@@ -583,6 +590,7 @@
     const selectionDetailBodyEl = document.getElementById("selectionDetailBody");
     const eyeFloorInputEl = document.getElementById("eyeFloorInput");
     const startEyeRotateButton = document.getElementById("startEyeRotate");
+    const resetInitialViewButton = document.getElementById("resetInitialView");
     const floorTotalAngleEl = document.getElementById("floorTotalAngle");
     const riverExtendInput = document.getElementById("riverExtendMeters");
     const PUBLIC_VWORLD_KEY = "";
@@ -742,6 +750,29 @@
       viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
       enable3DControls();
       setStatus("회전을 정지했습니다.");
+    }
+
+    async function returnToInitialView() {
+      stopAutoRotate();
+      clearSelectedSightLines();
+      viewer.selectedEntity = undefined;
+      updateSelectionDetails(null);
+      updateEyeFloorInput(null);
+      updateFloorTotalAngle(null);
+      lastPickedHeightScreenPosition = null;
+      viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      enable3DControls();
+
+      if (unitsDataSource) {
+        await viewer.zoomTo(unitsDataSource, new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(335),
+          Cesium.Math.toRadians(-45),
+          INITIAL_VIEW_RANGE
+        ));
+      } else {
+        reset3DView();
+      }
+      setStatus("초기화면으로 복귀했습니다.");
     }
 
     function cameraDistanceTo(center, fallback) {
@@ -2226,13 +2257,13 @@
       const startMs = performance.now();
       let completed = 0;
       let analyzed = 0;
-      setStatus(`${label} 조망 계산 중... 0/${targetFootprints.length}`);
+      setStatus(`${label} 조망 계산 중...\n유닛 폴리곤: 0/${targetFootprints.length}`);
 
       for (const footprint of targetFootprints) {
         if (storeViewAnalysisForFootprint(footprint)) analyzed += 1;
         completed += 1;
         if (completed % 2 === 0 || completed === targetFootprints.length) {
-          setStatus(`${label} 조망 계산 중... ${completed}/${targetFootprints.length}`);
+          setStatus(`${label} 조망 계산 중...\n유닛 폴리곤: ${completed}/${targetFootprints.length}`);
           await new Promise(resolve => requestAnimationFrame(resolve));
         }
       }
@@ -2242,7 +2273,7 @@
       calculatedZones.add(cacheKey);
       refreshLoadedDescriptions();
       const seconds = ((performance.now() - startMs) / 1000).toFixed(1);
-      setStatus(`${label} 조망 계산 완료\n계산 유닛: ${analyzed}/${targetFootprints.length}\n소요: ${seconds}초`);
+      setStatus(`${label} 조망 계산 완료\n계산 대상: 유닛 폴리곤 ${targetFootprints.length}개\n계산 완료: ${analyzed}개\n소요: ${seconds}초`);
     }
 
     function analyzeViewsForZone(zoneId, options = {}) {
@@ -2974,7 +3005,7 @@
       await viewer.zoomTo(source, new Cesium.HeadingPitchRange(
         Cesium.Math.toRadians(335),
         Cesium.Math.toRadians(-45),
-        900
+        INITIAL_VIEW_RANGE
       ));
 
       const prefix = loadedLabel ? `${loadedLabel} 로드 완료` : "GeoJSON 로드 완료";
@@ -3390,6 +3421,9 @@
     }
 
     document.getElementById("stopRotate").addEventListener("click", stopAutoRotate);
+    if (resetInitialViewButton) {
+      resetInitialViewButton.addEventListener("click", returnToInitialView);
+    }
 
     const pickHeightHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     pickHeightHandler.setInputAction((movement) => {
