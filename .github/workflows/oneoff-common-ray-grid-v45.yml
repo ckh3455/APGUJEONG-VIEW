@@ -1,0 +1,244 @@
+name: One-off common ray grid v45
+
+on:
+  push:
+    paths:
+      - ".github/workflows/oneoff-common-ray-grid-v45.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply common ray direction fix
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("index.html")
+          text = path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              '<div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+              '<div class="hint">버전: v45 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+              1,
+          )
+          text = text.replace(
+              'const DATA_VERSION = "v44-dual-river-preload-20260711";',
+              'const DATA_VERSION = "v45-common-ray-grid-20260711";',
+              1,
+          )
+          text = text.replace(
+              '? `두 한강라인 계산 완료 · 현재 기준: ${activeRiverConfig().label}`\n        : `보수적·완화적 한강라인 동시 준비 중 · 현재 기준: ${activeRiverConfig().label}`;',
+              '? `두 한강라인 계산 완료 · 공통 레이 방향망 · 현재 기준: ${activeRiverConfig().label}`\n        : `보수적·완화적 한강라인 동시 준비 중 · 공통 레이 방향망 생성 · 현재 기준: ${activeRiverConfig().label}`;',
+              1,
+          )
+
+          prepare_old = '''        await preloadRiverModeFiles();
+        viewAnalysisCacheByMode.clear();
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {'''
+          prepare_new = '''        await preloadRiverModeFiles();
+        viewAnalysisCacheByMode.clear();
+
+        // 두 기준 모두 같은 레이 방향 후보를 사용하도록 두 한강라인 컨텍스트를 먼저 준비한다.
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+          preparedRiverState(mode, zoneIds);
+        }
+
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {'''
+          if prepare_old not in text:
+              raise SystemExit("prepareBothRiverModeAnalyses insertion point not found")
+          text = text.replace(prepare_old, prepare_new, 1)
+
+          collect_new = r'''    function collectFacadeCandidates(footprint) {
+      const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
+      const blockers = new Map();
+      const candidates = [];
+      const commonContexts = commonRiverContextsForAngleGrid();
+      const commonPoints = commonRiverPointsForAngleGrid(commonContexts);
+
+      for (const sample of samples) {
+        const scan = angularScanForRiver(sample.point, commonPoints);
+        for (const angle of scan.angles) {
+          let activeHit = null;
+          let commonBlockerDistance = 0;
+
+          // 동일한 정수 각도 레이를 두 기준에 공통으로 사용한다.
+          // 차폐 판정 거리도 두 한강라인 중 더 먼 교차점까지 통일하여,
+          // 같은 방향 레이가 기준 전환 때문에 다른 차폐 결과를 내지 않게 한다.
+          for (const item of commonContexts) {
+            const hit = nearestRayHit(sample.point, angle, item.context.segments);
+            if (!hit || !Number.isFinite(hit.distance) || hit.distance <= 2) continue;
+            commonBlockerDistance = Math.max(commonBlockerDistance, hit.distance);
+            if (item.mode === currentRiverMode) activeHit = hit;
+          }
+
+          // 초기 로딩 중 공통 컨텍스트가 아직 없을 때의 안전한 대체 경로.
+          if (!activeHit) {
+            const fallbackHit = nearestRayHit(sample.point, angle, activeRiverSegments);
+            if (fallbackHit && Number.isFinite(fallbackHit.distance) && fallbackHit.distance > 2) {
+              activeHit = fallbackHit;
+              commonBlockerDistance = Math.max(commonBlockerDistance, fallbackHit.distance);
+            }
+          }
+          if (!activeHit) continue;
+
+          const rad = Cesium.Math.toRadians(angle);
+          const target = {
+            x: sample.point.x + Math.sin(rad) * activeHit.distance,
+            y: sample.point.y + Math.cos(rad) * activeHit.distance
+          };
+          if (!viewRayLeavesBuilding(sample.point, target, footprint)) continue;
+
+          const blockerProfile = rayBlockerProfile(
+            sample.point,
+            angle,
+            commonBlockerDistance || activeHit.distance,
+            footprint
+          );
+          if (blockerProfile.internalBlocked) continue;
+
+          for (const blocker of blockerProfile.blockers) {
+            const key = `${blocker.zoneName || ""}:${blocker.dong}동`;
+            const current = blockers.get(key);
+            if (!current || blocker.distance < current.distance) blockers.set(key, blocker);
+          }
+
+          candidates.push({
+            angle,
+            distance: activeHit.distance,
+            origin: sample.point,
+            end: target,
+            blockerHeight: blockerProfile.maxBlockerHeight,
+            blockers: blockerProfile.blockers,
+            sample
+          });
+        }
+      }
+
+      return {
+        samples,
+        candidates,
+        angleProfiles: buildAngleProfiles(candidates),
+        blockers: [...blockers.values()].sort((a, b) => a.distance - b.distance)
+      };
+    }'''
+
+          text, count = re.subn(
+              r'^    function collectFacadeCandidates\(footprint\) \{.*?^    \}\n\n(?=    function summarizeFacadeCandidates)',
+              collect_new + "\n\n",
+              text,
+              count=1,
+              flags=re.S | re.M,
+          )
+          if count != 1:
+              raise SystemExit(f"collectFacadeCandidates replacement count={count}")
+
+          angle_new = r'''    function commonRiverContextsForAngleGrid() {
+      const contexts = [];
+      for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+        const state = preparedRiverStateByMode.get(mode);
+        if (!state || !state.context || !state.context.segments || !state.context.segments.length) continue;
+        contexts.push({ mode, context: state.context });
+      }
+      if (!contexts.length) {
+        contexts.push({
+          mode: currentRiverMode,
+          context: {
+            segments: activeRiverSegments,
+            points: activeRiverPoints
+          }
+        });
+      }
+      return contexts;
+    }
+
+    function commonRiverPointsForAngleGrid(contexts = commonRiverContextsForAngleGrid()) {
+      const points = [];
+      const seen = new Set();
+      for (const item of contexts) {
+        for (const point of item.context.points || []) {
+          const key = `${Math.round(point.x * 10)}:${Math.round(point.y * 10)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          points.push(point);
+        }
+      }
+      return points.length ? points : activeRiverPoints;
+    }
+
+    function angularScanForRiver(origin, scanPoints = commonRiverPointsForAngleGrid()) {
+      const bearings = scanPoints
+        .map(point => bearingTo(origin, point))
+        .filter(value => Number.isFinite(value))
+        .sort((a, b) => a - b);
+      if (!bearings.length) return { angles: [], targetSpan: 0, start: null, end: null };
+      if (bearings.length === 1) {
+        const angle = normalizeAngle(Math.round(bearings[0]));
+        return { angles: [angle], targetSpan: 1, start: angle, end: angle };
+      }
+
+      let largestGap = -1;
+      let gapIndex = 0;
+      for (let i = 0; i < bearings.length; i += 1) {
+        const current = bearings[i];
+        const next = bearings[(i + 1) % bearings.length] + (i === bearings.length - 1 ? 360 : 0);
+        const gap = next - current;
+        if (gap > largestGap) {
+          largestGap = gap;
+          gapIndex = i;
+        }
+      }
+
+      const start = bearings[(gapIndex + 1) % bearings.length];
+      const end = bearings[gapIndex];
+      const span = Math.max(0, 360 - largestGap);
+      const angles = [];
+      const seen = new Set();
+      for (let offset = 0; offset <= span; offset += 1) {
+        const angle = normalizeAngle(Math.round(start + offset));
+        if (!seen.has(angle)) {
+          seen.add(angle);
+          angles.push(angle);
+        }
+      }
+      return { angles, targetSpan: Math.round(span), start, end };
+    }'''
+
+          text, count = re.subn(
+              r'^    function angularScanForRiver\(origin\) \{.*?^    \}\n\n(?=    function normalizeZoneId)',
+              angle_new + "\n\n",
+              text,
+              count=1,
+              flags=re.S | re.M,
+          )
+          if count != 1:
+              raise SystemExit(f"angularScanForRiver replacement count={count}")
+
+          text = text.replace(
+              'setStatus(`보수적·완화적 한강라인 동시 로드 완료\n전환 시 재로딩 없이 즉시 표시됩니다.\n현재 기준: ${activeRiverConfig().label}`);',
+              'setStatus(`보수적·완화적 한강라인 동시 로드 완료\n두 기준에 공통 1도 레이 방향망을 적용했습니다.\n현재 기준: ${activeRiverConfig().label}`);',
+              1,
+          )
+
+          path.write_text(text, encoding="utf-8")
+          print("index.html patched to v45 common ray grid")
+          PY
+
+      - name: Commit patched index and remove one-off workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/oneoff-common-ray-grid-v45.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/oneoff-common-ray-grid-v45.yml
+          git commit -m "Fix river modes to share ray directions"
+          git push
