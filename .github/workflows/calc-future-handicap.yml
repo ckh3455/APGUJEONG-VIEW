@@ -6,12 +6,14 @@ on:
       - calc-new-hangang-20260711
     paths:
       - calc_future_handicap.mjs
+      - calc_future_handicap_trigger.txt
       - .github/workflows/calc-future-handicap.yml
   pull_request:
     branches:
       - main
     paths:
       - calc_future_handicap.mjs
+      - calc_future_handicap_trigger.txt
       - .github/workflows/calc-future-handicap.yml
 
 permissions:
