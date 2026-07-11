@@ -530,7 +530,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, INITIAL_VIEW_HEIGHT);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v41-same-dong-envelope-20260709";
+    const DATA_VERSION = "v41-new-hangang-line-20260711";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -540,7 +540,7 @@
       "apgujeong_osm_clipping_zones.geojson"
     ];
     const OSM_BUILDING_VERTICAL_OFFSET_M = Number(new URLSearchParams(window.location.search).get("osmOffset") || -62);
-    const ALL_RIVER_URL = "hangang_line_all.geojson";
+    const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-2";
     const ZONE_CONFIGS = {
       "ALL": {
         label: "전체",
