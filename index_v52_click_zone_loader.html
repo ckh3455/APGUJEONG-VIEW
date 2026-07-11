@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>압구정 조망 시뮬레이션</title><style>html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;font-family:Arial,"Malgun Gothic",sans-serif;background:#f8fafc;color:#334155}#m{padding:18px 22px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:700;white-space:pre-wrap}</style></head><body><div id="m">압구정 조망 시뮬레이션 v52를 불러오는 중입니다.</div><script>
+(async()=>{const m=document.getElementById('m');try{let s=await(await fetch('./index_v50_loader.html?v=20260711-52',{cache:'no-store'})).text();const rep=(id,body)=>{const re=new RegExp('(<script type="text/plain" id="'+id+'">)[\\s\\S]*?(<\\/script>)');if(!re.test(s))throw new Error(id+' 패치 블록 없음');s=s.replace(re,'$1\n'+body.trim()+'\n  $2')};s=s.replaceAll('v50','v52').replaceAll('20260711-50','20260711-52');rep('updateRiverModeNotePatch',String.raw`
+    function updateRiverModeNote() {
+      if (!riverModeNoteEl) return;
+      if (currentZoneId === "ALL") {
+        riverModeNoteEl.textContent = "유닛 클릭 대기 · 어느 구역 유닛이든 클릭하면 해당 구역 전체를 계산합니다.";
+        return;
+      }
+      riverModeNoteEl.textContent = riverModesReady
+        ? zoneLabelForStatus(currentZoneId) + " 전체 계산 완료 · 보수적·완화적 저장 결과 · 현재 기준: " + activeRiverConfig().label
+        : zoneLabelForStatus(currentZoneId) + " 전체 유닛 계산 중 · 다른 구역도 차폐물로 유지";
+    }`);rep('loadZonePatch',String.raw`
+    async function loadZone(zoneId) {
+      const requestedZoneId = zoneId || "ALL";
+      const config = ZONE_CONFIGS[requestedZoneId] || ZONE_CONFIGS.ALL;
+      if (unitsDataSource && footprints.length) {
+        currentZoneId = requestedZoneId;
+        setActiveZoneButton(requestedZoneId);
+        clearSelectedSightLines();
+        setStatus(requestedZoneId === "ALL"
+          ? "전체 유닛 표시 중\n계산할 구역의 유닛을 클릭하세요.\n다른 구역 유닛도 차폐물로 계속 사용됩니다."
+          : config.label + " 유닛 클릭 대기\n버튼만으로는 계산하지 않습니다.\n" + config.label + " 안의 유닛을 클릭하면 해당 구역 전체를 계산합니다.");
+        updateRiverModeNote();
+        return;
+      }
+      const generation = ++optimizedCalculationGeneration;
+      currentZoneId = "ALL";
+      setActiveZoneButton("ALL");
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      setStatus("2·3·4·5구역 전체 유닛을 불러오는 중입니다.");
+      try {
+        const zoneIds = ["2", "3", "4", "5"];
+        const riverFilesPromise = preloadRiverModeFiles();
+        const unitsPromise = Promise.all(zoneIds.map(async id => ({zoneId:id,data:await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)}))).then(combineFeatureCollections);
+        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
+        if (generation !== optimizedCalculationGeneration) return;
+        preparedRiverStateByMode.clear();
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+        await loadGeoJson(unitsData, "전체");
+        if (generation !== optimizedCalculationGeneration) return;
+        currentZoneId = "ALL";
+        setActiveZoneButton("ALL");
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(true);
+        updateRiverModeNote();
+        setStatus("전체 지도 로드 완료\n조망 계산은 아직 시작하지 않았습니다.\n어느 구역 유닛이든 클릭하면 해당 구역의 보수적·완화적 전체 유닛을 계산합니다.\n나머지 구역 유닛도 차폐물로 유지됩니다.");
+      } catch (error) {
+        if (generation !== optimizedCalculationGeneration) return;
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus("전체 지도 로드 실패: " + error.message);
+      }
+    }`);rep('selectionPatch',String.raw`
+    viewer.selectedEntityChanged.addEventListener(async (entity) => {
+      updateEyeFloorInput(entity);
+      clearSelectedSightLines();
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        if (lastPickedHeightScreenPosition) setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
+        else updateSelectionDetails(null);
+        return;
+      }
+      showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
+      const clickedZoneId = zoneIdFromEntity(entity);
+      if (!clickedZoneId || !ZONE_CONFIGS[clickedZoneId]) {
+        setStatus("선택한 유닛의 구역을 확인하지 못했습니다.");
+        return;
+      }
+      const fid = String(entity.fidValue);
+      const sameZoneReady = currentZoneId === clickedZoneId && riverModesReady && viewAnalysisByFid.has(fid);
+      if (!sameZoneReady) {
+        if (currentZoneId !== clickedZoneId || !riverModesAnalysisPromise) {
+          optimizedCalculationGeneration += 1;
+          currentZoneId = clickedZoneId;
+          setActiveZoneButton(clickedZoneId);
+          preparedRiverStateByMode.clear();
+          resetViewAnalysisCache();
+          riverModesReady = false;
+          setRiverModeButtonsDisabled(true);
+          updateRiverModeNote();
+          activatePreparedRiverMode(currentRiverMode, { zoneIds: [clickedZoneId], draw: true });
+          setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 시작\n보수적·완화적 전체 유닛과 전층을 계산합니다.\n2·3·4·5구역 전체 유닛은 차폐물로 유지됩니다.");
+        }
+        try { await prepareBothRiverModeAnalyses(clickedZoneId); }
+        catch (error) { setStatus(zoneLabelForStatus(clickedZoneId) + " 계산 실패: " + error.message); return; }
+      }
+      if (viewer.selectedEntity !== entity) return;
+      if (!viewAnalysisByFid.has(fid)) { setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 결과를 준비하지 못했습니다."); return; }
+      drawSelectedSightLines(entity);
+      updateSelectionDetails(entity);
+      updateFloorTotalAngle(entity);
+    });`);document.open();document.write(s);document.close()}catch(e){console.error(e);m.textContent='앱 수정본을 불러오지 못했습니다.\n'+e.message}})();
+</script></body></html>
