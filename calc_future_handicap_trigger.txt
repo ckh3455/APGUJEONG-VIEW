@@ -1,1 +1,1 @@
-run 2026-07-11 future handicap analysis retry 2
+run 2026-07-11 future handicap analysis retry 3 after ready
