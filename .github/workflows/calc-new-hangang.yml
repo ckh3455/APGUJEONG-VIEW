@@ -17,8 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Checkout
+      - name: Checkout calculation branch
         uses: actions/checkout@v4
+        with:
+          ref: calc-new-hangang-20260711
 
       - name: Update app version and date
         run: |
@@ -71,7 +73,6 @@ jobs:
             view_rate_new_hangang_detail.csv
 
       - name: Commit app and calculation results
-        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
