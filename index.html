@@ -12,18 +12,18 @@
   </style>
 </head>
 <body>
-  <div id="bootMessage">압구정 조망 시뮬레이션 v49를 불러오는 중입니다.</div>
+  <div id="bootMessage">압구정 조망 시뮬레이션 v50을 불러오는 중입니다.</div>
 
   <script type="text/plain" id="updateRiverModeNotePatch">
     function updateRiverModeNote() {
       if (!riverModeNoteEl) return;
       if (currentZoneId === "ALL") {
-        riverModeNoteEl.textContent = "구역 선택 대기 · 2~5구역 중 하나를 선택하면 해당 구역만 계산합니다.";
+        riverModeNoteEl.textContent = "구역 선택 대기 · 2~5구역 중 하나를 선택하면 해당 구역 전체 유닛을 계산합니다.";
         return;
       }
       riverModeNoteEl.textContent = riverModesReady
-        ? `현재 구역 계산 완료 · 공통 레이 1회 계산 · 현재 기준: ${activeRiverConfig().label}`
-        : `현재 구역 공통 레이 계산 중 · 현재 기준: ${activeRiverConfig().label}`;
+        ? `현재 구역 전체 계산 완료 · 보수적·완화적 저장 결과 · 현재 기준: ${activeRiverConfig().label}`
+        : `현재 구역 전체 유닛 계산 중 · 보수적·완화적 동시 계산`;
     }
   </script>
 
@@ -64,7 +64,7 @@
       return points;
     }
 
-    function optimizedAngularScan(origin, scanPoints) {
+    function optimizedAngularScan(origin, scanPoints, angleStep = 1) {
       const bearings = (scanPoints || [])
         .map(point => bearingTo(origin, point))
         .filter(value => Number.isFinite(value))
@@ -89,18 +89,36 @@
 
       const start = bearings[(gapIndex + 1) % bearings.length];
       const span = Math.max(0, 360 - largestGap);
+      const step = Math.max(1, Number(angleStep) || 1);
       const angles = [];
       const seen = new Set();
-      for (let offset = 0; offset <= span; offset += 1) {
+      for (let offset = 0; offset <= span; offset += step) {
         const angle = normalizeAngle(Math.round(start + offset));
         if (seen.has(angle)) continue;
         seen.add(angle);
         angles.push(angle);
       }
+      const finalAngle = normalizeAngle(Math.round(start + span));
+      if (!seen.has(finalAngle)) angles.push(finalAngle);
       return { angles, targetSpan: Math.round(span) };
     }
 
-    function buildOptimizedBlockerGroups(allFootprints) {
+    function segmentBounds(segments) {
+      let minX = Number.POSITIVE_INFINITY;
+      let minY = Number.POSITIVE_INFINITY;
+      let maxX = Number.NEGATIVE_INFINITY;
+      let maxY = Number.NEGATIVE_INFINITY;
+      for (const segment of segments || []) {
+        minX = Math.min(minX, segment.a.x, segment.b.x);
+        minY = Math.min(minY, segment.a.y, segment.b.y);
+        maxX = Math.max(maxX, segment.a.x, segment.b.x);
+        maxY = Math.max(maxY, segment.a.y, segment.b.y);
+      }
+      if (!Number.isFinite(minX)) return null;
+      return { minX, minY, maxX, maxY };
+    }
+
+    function buildFastBlockerIndex(allFootprints, cellSize = 80) {
       const groups = new Map();
       for (const footprint of allFootprints || []) {
         const key = footprint.groupKey || `${footprint.zoneName}:${footprint.dong || ""}`;
@@ -114,7 +132,8 @@
             members: [],
             barrierSegments: footprint.groupBarrierSegments || footprint.segments || [],
             height: 0,
-            floors: 0
+            floors: 0,
+            bounds: null
           };
           groups.set(key, group);
         }
@@ -122,7 +141,69 @@
         group.height = Math.max(group.height, blockerOcclusionHeight(footprint));
         group.floors = Math.max(group.floors, blockerOcclusionFloors(footprint));
       }
-      return groups;
+
+      const grid = new Map();
+      const put = (cx, cy, key) => {
+        const cellKey = `${cx}:${cy}`;
+        if (!grid.has(cellKey)) grid.set(cellKey, new Set());
+        grid.get(cellKey).add(key);
+      };
+
+      for (const group of groups.values()) {
+        group.bounds = segmentBounds(group.barrierSegments);
+        if (!group.bounds) continue;
+        const minCX = Math.floor(group.bounds.minX / cellSize);
+        const maxCX = Math.floor(group.bounds.maxX / cellSize);
+        const minCY = Math.floor(group.bounds.minY / cellSize);
+        const maxCY = Math.floor(group.bounds.maxY / cellSize);
+        for (let cx = minCX; cx <= maxCX; cx += 1) {
+          for (let cy = minCY; cy <= maxCY; cy += 1) put(cx, cy, group.key);
+        }
+      }
+
+      return { groups, grid, cellSize };
+    }
+
+    function candidateGroupKeysAlongRay(origin, bearing, maxDistance, blockerIndex) {
+      const result = new Set();
+      const { grid, cellSize } = blockerIndex;
+      const rad = Cesium.Math.toRadians(bearing);
+      const dx = Math.sin(rad);
+      const dy = Math.cos(rad);
+      let cx = Math.floor(origin.x / cellSize);
+      let cy = Math.floor(origin.y / cellSize);
+      const stepX = dx > 0 ? 1 : dx < 0 ? -1 : 0;
+      const stepY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
+      const nextX = stepX > 0 ? (cx + 1) * cellSize : cx * cellSize;
+      const nextY = stepY > 0 ? (cy + 1) * cellSize : cy * cellSize;
+      let tMaxX = stepX === 0 ? Number.POSITIVE_INFINITY : (nextX - origin.x) / dx;
+      let tMaxY = stepY === 0 ? Number.POSITIVE_INFINITY : (nextY - origin.y) / dy;
+      const tDeltaX = stepX === 0 ? Number.POSITIVE_INFINITY : cellSize / Math.abs(dx);
+      const tDeltaY = stepY === 0 ? Number.POSITIVE_INFINITY : cellSize / Math.abs(dy);
+      let travelled = 0;
+      let guard = 0;
+      const maxGuard = Math.ceil(maxDistance / cellSize) * 4 + 20;
+
+      while (travelled <= maxDistance && guard < maxGuard) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          for (let oy = -1; oy <= 1; oy += 1) {
+            const entries = grid.get(`${cx + ox}:${cy + oy}`);
+            if (!entries) continue;
+            for (const key of entries) result.add(key);
+          }
+        }
+        if (tMaxX < tMaxY) {
+          cx += stepX;
+          travelled = tMaxX;
+          tMaxX += tDeltaX;
+        } else {
+          cy += stepY;
+          travelled = tMaxY;
+          tMaxY += tDeltaY;
+        }
+        guard += 1;
+      }
+      return result;
     }
 
     function nearestIntersectionDistance(origin, bearing, segments, maxDistance) {
@@ -135,14 +216,15 @@
       return nearest;
     }
 
-    function collectOptimizedObstacleEvents(origin, bearing, maxDistance, sourceFootprint, blockerGroups) {
-      let internalBlockDistance = Number.POSITIVE_INFINITY;
-      internalBlockDistance = Math.min(
-        internalBlockDistance,
-        nearestIntersectionDistance(origin, bearing, sourceFootprint.groupCoreBridgeSegments || [], maxDistance)
+    function collectFastObstacleEvents(origin, bearing, maxDistance, sourceFootprint, blockerIndex) {
+      let internalBlockDistance = nearestIntersectionDistance(
+        origin,
+        bearing,
+        sourceFootprint.groupCoreBridgeSegments || [],
+        maxDistance
       );
 
-      const sourceGroup = blockerGroups.get(sourceFootprint.groupKey);
+      const sourceGroup = blockerIndex.groups.get(sourceFootprint.groupKey);
       if (sourceGroup) {
         for (const member of sourceGroup.members) {
           if (String(member.fid) === String(sourceFootprint.fid)) continue;
@@ -154,8 +236,11 @@
       }
 
       const hits = [];
-      for (const group of blockerGroups.values()) {
-        if (group.key === sourceFootprint.groupKey) continue;
+      const candidateKeys = candidateGroupKeysAlongRay(origin, bearing, maxDistance, blockerIndex);
+      for (const key of candidateKeys) {
+        if (key === sourceFootprint.groupKey) continue;
+        const group = blockerIndex.groups.get(key);
+        if (!group) continue;
         const t = nearestIntersectionDistance(origin, bearing, group.barrierSegments, maxDistance);
         if (!Number.isFinite(t)) continue;
         hits.push({
@@ -171,13 +256,11 @@
       return { internalBlockDistance, hits };
     }
 
-    function blockerProfileFromOptimizedEvents(obstacleEvents, maxDistance) {
-      const filtered = (obstacleEvents.hits || [])
-        .filter(hit => hit.distance < maxDistance)
-        .sort((a, b) => a.distance - b.distance);
+    function blockerProfileFromFastEvents(obstacleEvents, maxDistance) {
       let maxBlockerHeight = 0;
       const blockers = [];
-      for (const hit of filtered) {
+      for (const hit of obstacleEvents.hits || []) {
+        if (hit.distance >= maxDistance) continue;
         if (hit.height > maxBlockerHeight) {
           maxBlockerHeight = hit.height;
           blockers.push(hit);
@@ -186,13 +269,27 @@
       return { maxBlockerHeight, blockers };
     }
 
-    function collectSharedFacadeCandidates(footprint, contexts, blockerGroups, commonPoints) {
-      const samples = sampleFacadeSegments(footprint, FACADE_SAMPLE_STEP_M);
+    function yieldToBrowser() {
+      return new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    async function collectSharedFacadeCandidatesAsync(
+      footprint,
+      contexts,
+      blockerIndex,
+      commonPoints,
+      quality,
+      progress,
+      generation
+    ) {
+      const samples = sampleFacadeSegments(footprint, quality.sampleStep);
       const rays = [];
+      let batchCount = 0;
 
       for (const sample of samples) {
-        const scan = optimizedAngularScan(sample.point, commonPoints);
+        const scan = optimizedAngularScan(sample.point, commonPoints, quality.angleStep);
         for (const angle of scan.angles) {
+          if (generation !== optimizedCalculationGeneration) return null;
           const hitsByMode = {};
           let maxDistance = 0;
           for (const item of contexts) {
@@ -201,23 +298,31 @@
             hitsByMode[item.mode] = hit.distance;
             maxDistance = Math.max(maxDistance, hit.distance);
           }
-          if (!maxDistance) continue;
 
-          const rad = Cesium.Math.toRadians(angle);
-          const farTarget = {
-            x: sample.point.x + Math.sin(rad) * maxDistance,
-            y: sample.point.y + Math.cos(rad) * maxDistance
-          };
-          if (!viewRayLeavesBuilding(sample.point, farTarget, footprint)) continue;
+          if (maxDistance > 0) {
+            const rad = Cesium.Math.toRadians(angle);
+            const farTarget = {
+              x: sample.point.x + Math.sin(rad) * maxDistance,
+              y: sample.point.y + Math.cos(rad) * maxDistance
+            };
+            if (viewRayLeavesBuilding(sample.point, farTarget, footprint)) {
+              const obstacleEvents = collectFastObstacleEvents(
+                sample.point,
+                angle,
+                maxDistance,
+                footprint,
+                blockerIndex
+              );
+              rays.push({ angle, origin: sample.point, sample, hitsByMode, obstacleEvents });
+            }
+          }
 
-          const obstacleEvents = collectOptimizedObstacleEvents(
-            sample.point,
-            angle,
-            maxDistance,
-            footprint,
-            blockerGroups
-          );
-          rays.push({ angle, origin: sample.point, sample, hitsByMode, obstacleEvents });
+          progress.rays += 1;
+          batchCount += 1;
+          if (batchCount >= quality.yieldEvery) {
+            batchCount = 0;
+            await yieldToBrowser();
+          }
         }
       }
 
@@ -234,7 +339,7 @@
         if (!Number.isFinite(modeDistance) || modeDistance <= 2) continue;
         if (ray.obstacleEvents.internalBlockDistance < modeDistance) continue;
 
-        const profile = blockerProfileFromOptimizedEvents(ray.obstacleEvents, modeDistance);
+        const profile = blockerProfileFromFastEvents(ray.obstacleEvents, modeDistance);
         for (const blocker of profile.blockers) {
           const key = `${blocker.zoneName || ""}:${blocker.dong || ""}`;
           const current = blockerMap.get(key);
@@ -268,10 +373,10 @@
     }
 
     function collectFacadeCandidates(footprint) {
-      const contexts = optimizedCommonRiverContexts();
-      const commonPoints = optimizedCommonRiverPoints(contexts);
-      const blockerGroups = buildOptimizedBlockerGroups(footprints);
-      const sharedData = collectSharedFacadeCandidates(footprint, contexts, blockerGroups, commonPoints);
+      const sharedData = sharedCandidateDataByFid.get(String(footprint.fid));
+      if (!sharedData) {
+        return { samples: [], candidates: [], angleProfiles: [], blockers: [] };
+      }
       return candidateDataForMode(sharedData, currentRiverMode);
     }
   </script>
@@ -319,12 +424,15 @@
       const closest = closestPointOnPolyline(footprint.center, context.segments);
       const direction = closest ? bearingTo(footprint.center, closest.point) : null;
       const displayFloor = Math.max(1, Math.round(footprint.floors || 1));
+      const floorViewCache = new Map();
       const facadeView = summarizeFacadeCandidates(
         footprint,
         candidateData,
         floorEyeHeight(footprint, displayFloor)
       );
-      const floorViewCache = new Map([[displayFloor, facadeView]]);
+      floorViewCache.set(displayFloor, facadeView);
+
+      const floorBands = buildFloorBands(footprint, candidateData, floorViewCache);
       const totalOpen = facadeView.totalOpen;
       const grade = totalOpen >= 60 ? "전면 조망" :
         totalOpen >= 30 ? "양호한 부분 조망" :
@@ -346,7 +454,7 @@
         visibleSampleCount: facadeView.visibleSampleCount,
         sampleCount: facadeView.sampleCount,
         candidateData,
-        floorBands: null,
+        floorBands,
         floorViewCache,
         displayFloor,
         displayEyeHeight: facadeView.observerHeight,
@@ -369,59 +477,109 @@
         const state = preparedRiverState(mode, zoneIds);
         if (state && state.context) contexts.push({ mode, context: state.context });
       }
+      if (contexts.length !== Object.keys(RIVER_MODE_CONFIGS).length) {
+        throw new Error("보수적·완화적 한강라인 준비가 완료되지 않았습니다.");
+      }
+
       const commonPoints = optimizedCommonRiverPoints(contexts);
       const footprintSnapshot = footprints.slice();
       const targets = footprintSnapshot.filter(fp => normalizeZoneId(fp.zoneName) === cacheKey);
-      const blockerGroups = buildOptimizedBlockerGroups(footprintSnapshot);
+      if (!targets.length) throw new Error(`${zoneLabelForStatus(cacheKey)} 계산 대상 유닛이 없습니다.`);
+
+      const blockerIndex = buildFastBlockerIndex(footprintSnapshot, 80);
       const modeAnalysisMaps = new Map(
         Object.keys(RIVER_MODE_CONFIGS).map(mode => [mode, new Map()])
       );
+      const quality = {
+        sampleStep: targets.length <= 70 ? 8 : 9,
+        angleStep: 1,
+        yieldEvery: 120
+      };
 
       viewAnalysisCacheByMode.clear();
       sharedCandidateDataByFid.clear();
       const started = performance.now();
-      let completed = 0;
-      setStatus(`${zoneLabelForStatus(cacheKey)} 공통 레이 계산 중...\n유닛 폴리곤: 0/${targets.length}`);
+      const progress = {
+        completed: 0,
+        total: targets.length,
+        current: "",
+        rays: 0
+      };
 
-      for (const footprint of targets) {
-        if (generation !== optimizedCalculationGeneration) return;
-        const sharedData = collectSharedFacadeCandidates(
-          footprint,
-          contexts,
-          blockerGroups,
-          commonPoints
+      const renderProgress = () => {
+        const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+        setStatus(
+          `${zoneLabelForStatus(cacheKey)} 전체 유닛 계산 중...\n` +
+          `보수적·완화적 동시 계산\n` +
+          `완료: ${progress.completed}/${progress.total}\n` +
+          `현재: ${progress.current || "준비 중"}\n` +
+          `처리 레이: ${progress.rays.toLocaleString()}개\n` +
+          `경과: ${elapsed}초`
         );
-        sharedCandidateDataByFid.set(String(footprint.fid), sharedData);
+      };
 
-        for (const item of contexts) {
-          const candidateData = candidateDataForMode(sharedData, item.mode);
-          const analysis = optimizedAnalysisForMode(footprint, candidateData, item.context);
-          modeAnalysisMaps.get(item.mode).set(String(footprint.fid), analysis);
+      renderProgress();
+      await yieldToBrowser();
+      const progressTimer = setInterval(renderProgress, 500);
+
+      try {
+        for (let index = 0; index < targets.length; index += 1) {
+          if (generation !== optimizedCalculationGeneration) return;
+          const footprint = targets[index];
+          progress.current = `${index + 1}/${targets.length} · ${footprint.dong || ""}동 ${footprint.unitType || ""}PY`;
+          renderProgress();
+
+          const sharedData = await collectSharedFacadeCandidatesAsync(
+            footprint,
+            contexts,
+            blockerIndex,
+            commonPoints,
+            quality,
+            progress,
+            generation
+          );
+          if (!sharedData || generation !== optimizedCalculationGeneration) return;
+          sharedCandidateDataByFid.set(String(footprint.fid), sharedData);
+
+          for (const item of contexts) {
+            const candidateData = candidateDataForMode(sharedData, item.mode);
+            const analysis = optimizedAnalysisForMode(footprint, candidateData, item.context);
+            modeAnalysisMaps.get(item.mode).set(String(footprint.fid), analysis);
+          }
+
+          progress.completed = index + 1;
+          renderProgress();
+          await yieldToBrowser();
         }
 
-        completed += 1;
-        if (completed % 2 === 0 || completed === targets.length) {
-          const elapsed = ((performance.now() - started) / 1000).toFixed(1);
-          setStatus(`${zoneLabelForStatus(cacheKey)} 공통 레이 계산 중...\n유닛 폴리곤: ${completed}/${targets.length}\n경과: ${elapsed}초`);
-          await new Promise(resolve => requestAnimationFrame(resolve));
+        if (generation !== optimizedCalculationGeneration) return;
+        for (const [mode, analysis] of modeAnalysisMaps.entries()) {
+          viewAnalysisCacheByMode.set(mode, {
+            analysis,
+            calculatedZones: new Set([cacheKey])
+          });
         }
-      }
 
-      if (generation !== optimizedCalculationGeneration) return;
-      for (const [mode, analysis] of modeAnalysisMaps.entries()) {
-        viewAnalysisCacheByMode.set(mode, {
-          analysis,
-          calculatedZones: new Set([cacheKey])
-        });
-      }
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+        restoreAnalysisCacheForMode(currentRiverMode);
+        riverModesReady = true;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        const seconds = ((performance.now() - started) / 1000).toFixed(1);
+        setStatus(
+          `${zoneLabelForStatus(cacheKey)} 전체 계산 완료\n` +
+          `보수적·완화적 전체 유닛 및 전층 결과 저장 완료\n` +
+          `유닛: ${targets.length}개\n` +
+          `처리 레이: ${progress.rays.toLocaleString()}개\n` +
+          `소요: ${seconds}초`
+        );
 
-      activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
-      restoreAnalysisCacheForMode(currentRiverMode);
-      riverModesReady = true;
-      setRiverModeButtonsDisabled(false);
-      updateRiverModeNote();
-      const seconds = ((performance.now() - started) / 1000).toFixed(1);
-      setStatus(`${zoneLabelForStatus(cacheKey)} 계산 완료\n공통 레이·차폐 계산: 1회\n보수적·완화적 결과 생성 완료\n유닛: ${targets.length}개 / 소요: ${seconds}초`);
+        setTimeout(() => {
+          if (!osmBuildingsTileset && !osmBuildingsLoading) showOsmBuildings();
+        }, 300);
+      } finally {
+        clearInterval(progressTimer);
+      }
     }
 
     function storeViewAnalysisForFootprint() {
@@ -493,17 +651,6 @@
         view: summaryForAnalysisFloor(footprint, analysis, floor)
       };
     }
-
-    function ensureFloorBandsForEntity(entity) {
-      if (!entity || !entity.fidValue) return false;
-      const footprint = entity.footprintForSight || footprints.find(f => String(f.fid) === String(entity.fidValue));
-      const analysis = viewAnalysisByFid.get(String(entity.fidValue));
-      if (!footprint || !analysis || !analysis.candidateData) return false;
-      if (analysis.floorBands) return false;
-      if (!analysis.floorViewCache) analysis.floorViewCache = new Map();
-      analysis.floorBands = buildFloorBands(footprint, analysis.candidateData, analysis.floorViewCache);
-      return true;
-    }
   </script>
 
   <script type="text/plain" id="switchAndRecalcPatch">
@@ -514,7 +661,7 @@
         return;
       }
       if (!riverModesReady && riverModesAnalysisPromise) {
-        setStatus(`${zoneLabelForStatus(currentZoneId)} 공통 레이 계산을 완료한 뒤 전환합니다.`);
+        setStatus(`${zoneLabelForStatus(currentZoneId)} 전체 유닛 계산 완료 후 자동으로 전환합니다.`);
         await riverModesAnalysisPromise;
       }
       if (!riverModesReady || !viewAnalysisCacheByMode.has(mode)) {
@@ -532,7 +679,6 @@
         activatePreparedRiverMode(mode, { zoneIds: currentLoadedZoneIds(), draw: true });
         restoreAnalysisCacheForMode(mode);
         if (selectedEntity) {
-          ensureFloorBandsForEntity(selectedEntity);
           drawSelectedSightLines(selectedEntity);
           updateSelectionDetails(selectedEntity);
         }
@@ -552,9 +698,8 @@
       preparedRiverStateByMode.clear();
       resetViewAnalysisCache();
       await prepareBothRiverModeAnalyses(currentZoneId);
-      setStatus(`${message}\n공통 레이 1회 방식으로 두 기준을 다시 계산했습니다.`);
+      setStatus(`${message}\n현재 구역의 보수적·완화적 전체 유닛을 다시 계산했습니다.`);
       if (viewer.selectedEntity) {
-        ensureFloorBandsForEntity(viewer.selectedEntity);
         drawSelectedSightLines(viewer.selectedEntity);
         updateSelectionDetails(viewer.selectedEntity);
       }
@@ -598,16 +743,21 @@
           riverModesReady = false;
           setRiverModeButtonsDisabled(true);
           updateRiverModeNote();
-          setStatus("지도 로드 완료\n전체 조망 계산은 시작하지 않았습니다.\n2~5구역 중 하나를 선택하면 해당 구역만 계산합니다.");
+          setStatus(
+            "지도 로드 완료\n" +
+            "전체 조망 계산은 시작하지 않았습니다.\n" +
+            "2~5구역 중 하나를 선택하면 해당 구역의 보수적·완화적 전체 유닛을 계산합니다."
+          );
           return;
         }
+
         await prepareBothRiverModeAnalyses(zoneId);
       } catch (error) {
         if (generation !== optimizedCalculationGeneration) return;
         riverModesReady = false;
         setRiverModeButtonsDisabled(false);
         updateRiverModeNote();
-        setStatus(`${config.label} 로드 실패: ${error.message}`);
+        setStatus(`${config.label} 로드 또는 계산 실패: ${error.message}`);
       }
     }
   </script>
@@ -637,9 +787,11 @@
         await riverModesAnalysisPromise;
       }
       if (viewer.selectedEntity !== entity) return;
-      if (!viewAnalysisByFid.has(String(entity.fidValue))) return;
+      if (!viewAnalysisByFid.has(String(entity.fidValue))) {
+        setStatus("현재 구역 전체 유닛 계산이 아직 완료되지 않았습니다.");
+        return;
+      }
 
-      ensureFloorBandsForEntity(entity);
       drawSelectedSightLines(entity);
       updateSelectionDetails(entity);
       updateFloorTotalAngle(entity);
@@ -648,7 +800,7 @@
 
   <script>
     (() => {
-      const BASE_FILE = "./index_v44_base.html?v=20260711-49";
+      const BASE_FILE = "./index_v44_base.html?v=20260711-50";
       const message = document.getElementById("bootMessage");
 
       function replaceRequired(source, before, after, label) {
@@ -676,13 +828,13 @@
         source = replaceRequired(
           source,
           '<div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
-          '<div class="hint">버전: v49 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+          '<div class="hint">버전: v50 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
           "버전"
         );
         source = replaceRequired(
           source,
           'const DATA_VERSION = "v44-dual-river-preload-20260711";',
-          'const DATA_VERSION = "v49-shared-ray-lazy-floor-20260711";',
+          'const DATA_VERSION = "v50-full-zone-fast-grid-20260711";',
           "데이터 버전"
         );
         source = replaceRequired(
@@ -692,66 +844,20 @@
           "최적화 캐시 변수"
         );
 
-        source = replaceBlock(source,
-          "    function updateRiverModeNote() {",
-          "    function currentLoadedZoneIds() {",
-          patchText("updateRiverModeNotePatch"),
-          "한강라인 안내"
-        );
-        source = replaceBlock(source,
-          "    function resetViewAnalysisCache() {",
-          "    function zoneLabelForStatus",
-          patchText("resetCachePatch"),
-          "캐시 초기화"
-        );
-        source = replaceBlock(source,
-          "    function collectFacadeCandidates(footprint) {",
-          "    function summarizeFacadeCandidates",
-          patchText("candidatePatch"),
-          "공통 레이 후보"
-        );
-        source = replaceBlock(source,
-          "    function buildFloorBands(footprint, candidateData) {",
-          "    function clearSelectedSightLines",
-          patchText("floorBandsPatch"),
-          "층별 캐시"
-        );
-        source = replaceBlock(source,
-          "    function storeViewAnalysisForFootprint(footprint) {",
-          "    function clearOutlines",
-          patchText("analysisPatch"),
-          "공통 구역 계산"
-        );
-        source = replaceBlock(source,
-          "    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {",
-          "    function applyPublicBaseMap",
-          patchText("preparePatch"),
-          "두 기준 준비"
-        );
-        source = replaceBlock(source,
-          "    function floorViewForEntity(entity, forcedFloor = null) {",
-          "    function updateFloorTotalAngle",
-          patchText("floorViewPatch"),
-          "층수 표시 캐시"
-        );
-        source = replaceBlock(source,
-          "    async function switchRiverMode(mode) {",
-          "    async function loadGeoJson",
-          patchText("switchAndRecalcPatch"),
-          "모드 전환"
-        );
-        source = replaceBlock(source,
-          "    async function loadZone(zoneId) {",
-          "    function applyVworldBaseMap",
-          patchText("loadZonePatch"),
-          "구역 선택 계산"
-        );
-        source = replaceBlock(source,
-          "    viewer.selectedEntityChanged.addEventListener(async (entity) => {",
-          "    setActiveRiverButton(currentRiverMode);",
-          patchText("selectionPatch"),
-          "유닛 선택 지연 계산"
-        );
+        source = replaceBlock(source, "    function updateRiverModeNote() {", "    function currentLoadedZoneIds() {", patchText("updateRiverModeNotePatch"), "한강라인 안내");
+        source = replaceBlock(source, "    function resetViewAnalysisCache() {", "    function zoneLabelForStatus", patchText("resetCachePatch"), "캐시 초기화");
+        source = replaceBlock(source, "    function collectFacadeCandidates(footprint) {", "    function summarizeFacadeCandidates", patchText("candidatePatch"), "고속 공통 레이 계산");
+        source = replaceBlock(source, "    function buildFloorBands(footprint, candidateData) {", "    function clearSelectedSightLines", patchText("floorBandsPatch"), "전층 결과 계산");
+        source = replaceBlock(source, "    function storeViewAnalysisForFootprint(footprint) {", "    function clearOutlines", patchText("analysisPatch"), "구역 전체 계산");
+        source = replaceBlock(source, "    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {", "    function applyPublicBaseMap", patchText("preparePatch"), "두 기준 준비");
+        source = replaceBlock(source, "    function floorViewForEntity(entity, forcedFloor = null) {", "    function updateFloorTotalAngle", patchText("floorViewPatch"), "층수 결과 캐시");
+        source = replaceBlock(source, "    async function switchRiverMode(mode) {", "    async function loadGeoJson", patchText("switchAndRecalcPatch"), "한강라인 전환");
+        source = replaceBlock(source, "    async function loadZone(zoneId) {", "    function applyVworldBaseMap", patchText("loadZonePatch"), "구역 선택 계산");
+        source = replaceBlock(source, "    viewer.selectedEntityChanged.addEventListener(async (entity) => {", "    setActiveRiverButton(currentRiverMode);", patchText("selectionPatch"), "유닛 선택");
+
+        const osmAutoLoadOld = ["    setTimeout(() => {", "      showOsmBuildings();", "    }, 3000);"].join("\n");
+        const osmAutoLoadNew = ["    setTimeout(() => {", "      if (currentZoneId === \"ALL\" && !riverModesAnalysisPromise) showOsmBuildings();", "    }, 12000);"].join("\n");
+        if (source.includes(osmAutoLoadOld)) source = source.replace(osmAutoLoadOld, osmAutoLoadNew);
 
         document.open();
         document.write(source);
