@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <div id="bootMessage">압구정 조망 시뮬레이션 v45를 불러오는 중입니다.</div>
+  <div id="bootMessage">압구정 조망 시뮬레이션 v46을 불러오는 중입니다.</div>
 
   <script type="text/plain" id="collectFacadePatch">
     function collectFacadeCandidates(footprint) {
@@ -37,7 +37,6 @@
             if (item.mode === currentRiverMode) activeHit = hit;
           }
 
-          // 두 기준의 사전 준비가 끝나기 전 호출되는 경우를 위한 안전장치다.
           if (!activeHit) {
             const fallbackHit = nearestRayHit(sample.point, angle, activeRiverSegments);
             if (fallbackHit && Number.isFinite(fallbackHit.distance) && fallbackHit.distance > 2) {
@@ -162,6 +161,44 @@
     }
   </script>
 
+  <script type="text/plain" id="switchModePatch">
+    async function switchRiverMode(mode) {
+      if (!RIVER_MODE_CONFIGS[mode]) return;
+
+      // 한강라인 버튼은 계산 버튼이 아니다. 구역 선택 때 시작한 두 기준 계산만 기다린다.
+      if (!riverModesReady && riverModesAnalysisPromise) {
+        setStatus(`${zoneLabelForStatus(currentZoneId)} 보수적·완화적 계산을 함께 진행 중입니다.\n완료 후 자동으로 전환합니다.`);
+        await riverModesAnalysisPromise;
+      }
+
+      if (!riverModesReady || !viewAnalysisCacheByMode.has(mode)) {
+        setStatus(`${zoneLabelForStatus(currentZoneId)}의 두 기준 계산 결과가 아직 준비되지 않았습니다.\n한강라인 버튼에서는 재계산하지 않습니다.`);
+        return;
+      }
+
+      if (mode === currentRiverMode) {
+        setActiveRiverButton(mode);
+        updateRiverModeNote();
+        return;
+      }
+
+      const selectedEntity = viewer.selectedEntity;
+      try {
+        activatePreparedRiverMode(mode, { zoneIds: currentLoadedZoneIds(), draw: true });
+        restoreAnalysisCacheForMode(mode);
+
+        if (selectedEntity) {
+          drawSelectedSightLines(selectedEntity);
+          updateSelectionDetails(selectedEntity);
+        }
+        updateFloorTotalAngle(selectedEntity);
+        setStatus(`${activeRiverConfig().label} 저장 결과로 즉시 전환했습니다.`);
+      } catch (error) {
+        setStatus(`${activeRiverConfig().label} 전환 실패: ${error.message}`);
+      }
+    }
+  </script>
+
   <script>
     (() => {
       const BASE_FILE = "./index_v44_base.html?v=20260711-46";
@@ -188,19 +225,45 @@
         source = replaceOnce(
           source,
           '<div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
-          '<div class="hint">버전: v45 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+          '<div class="hint">버전: v46 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
           "버전"
         );
         source = replaceOnce(
           source,
           'const DATA_VERSION = "v44-dual-river-preload-20260711";',
-          'const DATA_VERSION = "v45-common-ray-grid-20260711";',
+          'const DATA_VERSION = "v46-zone-dual-cache-20260711";',
           "데이터 버전"
         );
 
         const noteOld = '? `두 한강라인 계산 완료 · 현재 기준: ${activeRiverConfig().label}`\n        : `보수적·완화적 한강라인 동시 준비 중 · 현재 기준: ${activeRiverConfig().label}`;';
-        const noteNew = '? `두 한강라인 계산 완료 · 공통 레이 방향망 · 현재 기준: ${activeRiverConfig().label}`\n        : `보수적·완화적 한강라인 동시 준비 중 · 공통 레이 방향망 생성 · 현재 기준: ${activeRiverConfig().label}`;';
-        source = replaceOnce(source, noteOld, noteNew, "기준 안내");
+        const noteNew = '? `현재 구역 두 기준 계산 완료 · 버튼은 저장 결과 전환 · 현재 기준: ${activeRiverConfig().label}`\n        : `현재 구역 보수적·완화적 기준을 함께 계산 중 · 현재 기준: ${activeRiverConfig().label}`;';
+        if (source.includes(noteOld)) source = source.replace(noteOld, noteNew);
+
+        source = replaceOnce(
+          source,
+          '    let riverModesAnalysisPromise = null;\n    let riverModesReady = false;',
+          '    let riverModesAnalysisPromise = null;\n    let riverModesAnalysisZoneKey = null;\n    let riverModesReady = false;',
+          "구역별 계산 키"
+        );
+
+        const preparePrefixOld = [
+          '    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {',
+          '      if (riverModesAnalysisPromise) return riverModesAnalysisPromise;',
+          '      const zoneIds = currentLoadedZoneIds();',
+          '      const originalMode = currentRiverMode;'
+        ].join("\n");
+        const preparePrefixNew = [
+          '    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {',
+          '      const zoneIds = currentLoadedZoneIds();',
+          '      const analysisKey = `${normalizeZoneId(zoneId) || "ALL"}|${zoneIds.join(",")}`;',
+          '      if (riverModesAnalysisPromise) {',
+          '        if (riverModesAnalysisZoneKey === analysisKey) return riverModesAnalysisPromise;',
+          '        await riverModesAnalysisPromise;',
+          '      }',
+          '      const originalMode = currentRiverMode;',
+          '      riverModesAnalysisZoneKey = analysisKey;'
+        ].join("\n");
+        source = replaceOnce(source, preparePrefixOld, preparePrefixNew, "구역별 두 기준 계산");
 
         const prepareOld = [
           "        await preloadRiverModeFiles();",
@@ -211,17 +274,35 @@
           "        await preloadRiverModeFiles();",
           "        viewAnalysisCacheByMode.clear();",
           "",
-          "        // 두 기준 모두 같은 레이 방향 후보를 사용하도록 두 한강라인 컨텍스트를 먼저 준비한다.",
+          "        // 구역 버튼 한 번으로 두 한강라인 컨텍스트와 계산 결과를 모두 준비한다.",
           "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {",
           "          preparedRiverState(mode, zoneIds);",
           "        }",
           "",
-          "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {"
+          "        let modeIndex = 0;",
+          "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {",
+          "          modeIndex += 1;"
         ].join("\n");
-        source = replaceOnce(source, prepareOld, prepareNew, "공통 컨텍스트 준비");
+        source = replaceOnce(source, prepareOld, prepareNew, "두 기준 일괄 준비");
+
+        source = replaceOnce(
+          source,
+          '          setStatus(`${activeRiverConfig().label} 조망 계산 준비 중...`);',
+          '          setStatus(`${zoneLabelForStatus(zoneId)} 두 기준 일괄 계산 중 (${modeIndex}/2)\\n현재: ${activeRiverConfig().label}`);',
+          "두 기준 진행 표시"
+        );
+
+        source = replaceOnce(
+          source,
+          '      })().finally(() => {\n        riverModesAnalysisPromise = null;\n      });',
+          '      })().finally(() => {\n        riverModesAnalysisPromise = null;\n        riverModesAnalysisZoneKey = null;\n      });',
+          "계산 키 정리"
+        );
 
         const collectPatch = document.getElementById("collectFacadePatch").textContent.replace(/^\n/, "").trimEnd();
         const anglePatch = document.getElementById("angleScanPatch").textContent.replace(/^\n/, "").trimEnd();
+        const switchPatch = document.getElementById("switchModePatch").textContent.replace(/^\n/, "").trimEnd();
+
         source = replaceBlock(
           source,
           "    function collectFacadeCandidates(footprint) {",
@@ -236,13 +317,32 @@
           anglePatch,
           "공통 각도망"
         );
+        source = replaceBlock(
+          source,
+          "    async function switchRiverMode(mode) {",
+          "    async function recalculateViews",
+          switchPatch,
+          "한강라인 저장 결과 전환"
+        );
 
-        // 완료 안내 문구는 계산 로직과 무관하므로, 원문이 정확히 일치할 때만 바꾼다.
+        const entityCalcOld = [
+          '      if (!viewAnalysisByFid.has(fid)) {',
+          '        setStatus(`${zoneLabelForStatus(zoneId)} 조망 계산을 시작합니다.`);',
+          '        await analyzeViewsForZone(zoneId);',
+          '      }'
+        ].join("\n");
+        const entityCalcNew = [
+          '      if (!viewAnalysisByFid.has(fid)) {',
+          '        setStatus(`${zoneLabelForStatus(zoneId)} 보수적·완화적 일괄 계산 완료를 기다리는 중입니다.`);',
+          '        if (riverModesAnalysisPromise) await riverModesAnalysisPromise;',
+          '        if (!viewAnalysisByFid.has(fid)) return;',
+          '      }'
+        ].join("\n");
+        source = replaceOnce(source, entityCalcOld, entityCalcNew, "유닛 클릭 재계산 방지");
+
         const statusOld = '        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n전환 시 재로딩 없이 즉시 표시됩니다.\n현재 기준: ${activeRiverConfig().label}`);';
-        const statusNew = '        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n두 기준에 공통 1도 레이 방향망을 적용했습니다.\n현재 기준: ${activeRiverConfig().label}`);';
-        if (source.includes(statusOld)) {
-          source = source.replace(statusOld, statusNew);
-        }
+        const statusNew = '        setStatus(`${zoneLabelForStatus(zoneId)} 보수적·완화적 두 기준 계산 완료\n한강라인 버튼은 재계산 없이 저장 결과만 전환합니다.\n현재 기준: ${activeRiverConfig().label}`);';
+        if (source.includes(statusOld)) source = source.replace(statusOld, statusNew);
 
         document.open();
         document.write(source);
