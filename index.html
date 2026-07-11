@@ -164,7 +164,7 @@
 
   <script>
     (() => {
-      const BASE_FILE = "./index_v44_base.html?v=20260711-45";
+      const BASE_FILE = "./index_v44_base.html?v=20260711-46";
       const message = document.getElementById("bootMessage");
 
       function replaceOnce(source, before, after, label) {
@@ -237,9 +237,12 @@
           "공통 각도망"
         );
 
+        // 완료 안내 문구는 계산 로직과 무관하므로, 원문이 정확히 일치할 때만 바꾼다.
         const statusOld = '        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n전환 시 재로딩 없이 즉시 표시됩니다.\n현재 기준: ${activeRiverConfig().label}`);';
         const statusNew = '        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n두 기준에 공통 1도 레이 방향망을 적용했습니다.\n현재 기준: ${activeRiverConfig().label}`);';
-        source = replaceOnce(source, statusOld, statusNew, "완료 안내");
+        if (source.includes(statusOld)) {
+          source = source.replace(statusOld, statusNew);
+        }
 
         document.open();
         document.write(source);
