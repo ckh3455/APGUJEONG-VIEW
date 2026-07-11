@@ -7,6 +7,12 @@ on:
     paths:
       - calc_future_handicap.mjs
       - .github/workflows/calc-future-handicap.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - calc_future_handicap.mjs
+      - .github/workflows/calc-future-handicap.yml
 
 permissions:
   contents: read
