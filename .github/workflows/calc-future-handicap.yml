@@ -17,10 +17,11 @@ on:
       - .github/workflows/calc-future-handicap.yml
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   calculate:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -56,3 +57,12 @@ jobs:
             future_handicap_reference_coefficients.csv
             future_handicap_distribution.csv
             future_handicap_detail.csv
+
+      - name: Commit results to branch
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add future_handicap_result.json future_handicap_summary.csv future_handicap_reference_coefficients.csv future_handicap_distribution.csv future_handicap_detail.csv
+          git commit -m "Add future handicap calculation results [skip future-handicap]" || exit 0
+          git push origin HEAD:calc-new-hangang-20260711
