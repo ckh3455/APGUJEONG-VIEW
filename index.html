@@ -84,12 +84,14 @@
       align-items: center;
     }
     .zone-tabs,
+    .river-tabs,
     .map-tabs {
       display: flex;
       gap: 4px;
       margin-top: 6px;
     }
     .zone-tabs button,
+    .river-tabs button,
     .map-tabs button {
       flex: 1;
       background: #e2e8f0;
@@ -115,6 +117,7 @@
       white-space: nowrap;
     }
     .zone-tabs button.active,
+    .river-tabs button.active,
     .map-tabs button.active {
       background: #2563eb;
       color: #ffffff;
@@ -134,6 +137,17 @@
       margin-top: 4px;
       color: #64748b;
       font-size: 10px;
+    }
+    .river-mode-note {
+      margin-top: 3px;
+      padding: 4px 6px;
+      border-radius: 5px;
+      background: #eef6ff;
+      color: #1e3a5f;
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.3;
+      text-align: center;
     }
     .legend {
       display: flex;
@@ -321,6 +335,7 @@
         display: none;
       }
       .zone-tabs,
+      .river-tabs,
       .map-tabs {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -331,6 +346,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .zone-tabs button,
+      .river-tabs button,
       .map-tabs button,
       .buttons button {
         min-height: 27px;
@@ -429,6 +445,7 @@
         max-height: 45svh;
       }
       .zone-tabs button,
+      .river-tabs button,
       .map-tabs button,
       .buttons button {
         min-height: 25px;
@@ -481,7 +498,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v41 / <strong>정밀도면이 아닙니다</strong></div>
+    <div class="hint">버전: v43 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -489,6 +506,11 @@
       <button type="button" data-zone="4">4구역</button>
       <button type="button" data-zone="5">5구역</button>
     </div>
+    <div class="river-tabs" aria-label="한강라인 기준 선택">
+      <button type="button" class="active" data-river-mode="conservative">보수적 한강라인</button>
+      <button type="button" data-river-mode="relaxed">완화적 한강라인</button>
+    </div>
+    <div id="riverModeNote" class="river-mode-note">현재 기준: 보수적 한강라인</div>
     <div class="map-tabs" aria-label="배경지도 선택">
       <button type="button" class="active" data-map="street">도로지도</button>
       <button type="button" data-map="light">밝은지도</button>
@@ -530,7 +552,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, INITIAL_VIEW_HEIGHT);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v41-new-hangang-line-20260711";
+    const DATA_VERSION = "v43-river-line-compare-20260711";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -540,7 +562,28 @@
       "apgujeong_osm_clipping_zones.geojson"
     ];
     const OSM_BUILDING_VERTICAL_OFFSET_M = Number(new URLSearchParams(window.location.search).get("osmOffset") || -62);
-    const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-2";
+    const RIVER_MODE_CONFIGS = {
+      conservative: {
+        label: "보수적 한강라인",
+        shortLabel: "보수적",
+        url: "hangang_line_all.geojson?v=20260711-4",
+        color: "#00d4ff"
+      },
+      relaxed: {
+        label: "완화적 한강라인",
+        shortLabel: "완화적",
+        url: "hangang_line_new.geojson?v=20260711-4",
+        color: "#22c55e"
+      }
+    };
+    let currentRiverMode = "conservative";
+    function activeRiverConfig() {
+      return RIVER_MODE_CONFIGS[currentRiverMode] || RIVER_MODE_CONFIGS.conservative;
+    }
+    function activeRiverUrl() {
+      return activeRiverConfig().url;
+    }
+    const ALL_RIVER_URL = RIVER_MODE_CONFIGS.conservative.url;
     const ZONE_CONFIGS = {
       "ALL": {
         label: "전체",
@@ -592,6 +635,7 @@
     const startEyeRotateButton = document.getElementById("startEyeRotate");
     const resetInitialViewButton = document.getElementById("resetInitialView");
     const floorTotalAngleEl = document.getElementById("floorTotalAngle");
+    const riverModeNoteEl = document.getElementById("riverModeNote");
     const riverExtendInput = document.getElementById("riverExtendMeters");
     const PUBLIC_VWORLD_KEY = "";
     const VWORLD_KEY_STORAGE = "apgujeong_vworld_key";
@@ -695,6 +739,17 @@
       for (const button of document.querySelectorAll("[data-map]")) {
         button.classList.toggle("active", button.dataset.map === mapId);
       }
+    }
+
+    function setActiveRiverButton(mode) {
+      for (const button of document.querySelectorAll("[data-river-mode]")) {
+        button.classList.toggle("active", button.dataset.riverMode === mode);
+      }
+    }
+
+    function updateRiverModeNote() {
+      if (!riverModeNoteEl) return;
+      riverModeNoteEl.textContent = `현재 기준: ${activeRiverConfig().label}`;
     }
 
     function applyPublicBaseMap(mapId = "street") {
@@ -2319,7 +2374,7 @@
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArrayHeights(degrees),
             width: 5,
-            material: Cesium.Color.fromCssColorString("#00d4ff").withAlpha(0.9),
+            material: Cesium.Color.fromCssColorString(activeRiverConfig().color).withAlpha(0.9),
             clampToGround: false
           }
         }));
@@ -2751,6 +2806,7 @@
     function buildDescription(props) {
       const analysis = viewAnalysisByFid.get(String(props.fid));
       const rows = [
+        ["한강라인", activeRiverConfig().label],
         ["구역", escapeHtml(props.zone || props.source_zone || "")],
         ["동", formatDong(props.dong)],
         ["타입", formatUnitType(props.unit_type)],
@@ -2876,6 +2932,7 @@
     function riverStatusText() {
       if (!lastRiverStats) return "한강라인: 미로드";
       return [
+        `기준: ${activeRiverConfig().label}`,
         `한강라인: ${lastRiverStats.lineCount}개`,
         `원본 길이: ${Math.round(lastRiverStats.sourceLength)} m`,
         `계산 길이: ${Math.round(lastRiverStats.analysisLength)} m`,
@@ -2889,6 +2946,54 @@
       const extendMeters = getRiverExtendMeters();
       for (const [zoneId, data] of riverRawGeoJsonByZone.entries()) {
         riverContextsByZone.set(zoneId, buildRiverContext(data, extendMeters));
+      }
+    }
+
+    async function switchRiverMode(mode) {
+      if (!RIVER_MODE_CONFIGS[mode]) return;
+      if (mode === currentRiverMode && riverRawGeoJson) {
+        setActiveRiverButton(mode);
+        updateRiverModeNote();
+        setStatus(`${activeRiverConfig().label}이 이미 적용되어 있습니다.`);
+        return;
+      }
+
+      const zonesToRecalculate = new Set(calculatedZones);
+      const selectedZoneId = zoneIdFromEntity(viewer.selectedEntity);
+      if (selectedZoneId) zonesToRecalculate.add(selectedZoneId);
+      if (!zonesToRecalculate.size && currentZoneId !== "ALL") zonesToRecalculate.add(currentZoneId);
+      const loadedZoneIds = currentZoneId === "ALL" ? ["2", "3", "4", "5"] : [currentZoneId];
+
+      currentRiverMode = mode;
+      setActiveRiverButton(mode);
+      updateRiverModeNote();
+      setStatus(`${activeRiverConfig().label}으로 전환하는 중입니다.`);
+
+      try {
+        const riverData = await fetchGeoJson(activeRiverUrl());
+        riverRawGeoJsonByZone.clear();
+        for (const zoneId of loadedZoneIds) {
+          riverRawGeoJsonByZone.set(zoneId, riverData);
+        }
+        riverRawGeoJson = riverData;
+        rebuildRiverContexts();
+        lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
+        drawRiverLines();
+        resetViewAnalysisCache();
+        refreshLoadedDescriptions();
+
+        for (const zoneId of zonesToRecalculate) {
+          await analyzeViewsForZone(zoneId, { force: true });
+        }
+
+        setStatus(`${activeRiverConfig().label} 적용 완료\n${riverStatusText()}\n유닛 수: ${footprints.length}`);
+        if (viewer.selectedEntity) {
+          drawSelectedSightLines(viewer.selectedEntity);
+          updateSelectionDetails(viewer.selectedEntity);
+        }
+        updateFloorTotalAngle(viewer.selectedEntity);
+      } catch (error) {
+        setStatus(`${activeRiverConfig().label} 전환 실패: ${error.message}`);
       }
     }
 
@@ -3282,6 +3387,9 @@
       try {
         let riverData;
         let unitsData;
+        const currentRiverUrl = activeRiverUrl();
+        setActiveRiverButton(currentRiverMode);
+        updateRiverModeNote();
 
         if (config.zoneIds) {
           const zoneConfigs = config.zoneIds.map(id => ({ id, ...ZONE_CONFIGS[id] }));
@@ -3291,20 +3399,20 @@
               data: await fetchGeoJson(item.unitsUrl)
             }))
           );
-          const uniqueRiverUrls = [...new Set(zoneConfigs.map(item => item.riverUrl))];
+          const uniqueRiverUrls = [currentRiverUrl];
           const riverCollections = await Promise.all(
             uniqueRiverUrls.map(async url => ({ data: await fetchGeoJson(url) }))
           );
           const riverDataByUrl = new Map(riverCollections.map(({ data }, index) => [uniqueRiverUrls[index], data]));
           riverRawGeoJsonByZone.clear();
           for (const item of zoneConfigs) {
-            riverRawGeoJsonByZone.set(item.id, riverDataByUrl.get(item.riverUrl));
+            riverRawGeoJsonByZone.set(item.id, riverDataByUrl.get(currentRiverUrl));
           }
           unitsData = combineFeatureCollections(unitCollections);
           riverData = combineRiverCollections(riverCollections);
         } else {
           const [singleRiverData, singleUnitsData] = await Promise.all([
-            fetchGeoJson(config.riverUrl),
+            fetchGeoJson(currentRiverUrl),
             fetchGeoJson(config.unitsUrl)
           ]);
           riverRawGeoJsonByZone.clear();
@@ -3401,6 +3509,12 @@
       });
     }
 
+    for (const button of document.querySelectorAll("[data-river-mode]")) {
+      button.addEventListener("click", () => {
+        switchRiverMode(button.dataset.riverMode);
+      });
+    }
+
     for (const button of document.querySelectorAll("[data-map]")) {
       button.addEventListener("click", () => {
         applyPublicBaseMap(button.dataset.map);
@@ -3466,6 +3580,8 @@
       updateFloorTotalAngle(entity);
     });
 
+    setActiveRiverButton(currentRiverMode);
+    updateRiverModeNote();
     setTimeout(() => applyPublicBaseMap("street"), 300);
 
     loadZone(currentZoneId);
