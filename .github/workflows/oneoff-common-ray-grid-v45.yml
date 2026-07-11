@@ -242,3 +242,5 @@ jobs:
           git add index.html .github/workflows/oneoff-common-ray-grid-v45.yml
           git commit -m "Fix river modes to share ray directions"
           git push
+
+# trigger existing workflow
