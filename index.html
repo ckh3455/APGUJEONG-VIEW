@@ -498,7 +498,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v43 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>
+    <div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -510,7 +510,7 @@
       <button type="button" class="active" data-river-mode="conservative">보수적 한강라인</button>
       <button type="button" data-river-mode="relaxed">완화적 한강라인</button>
     </div>
-    <div id="riverModeNote" class="river-mode-note">현재 기준: 보수적 한강라인</div>
+    <div id="riverModeNote" class="river-mode-note">보수적·완화적 한강라인 동시 준비 중</div>
     <div class="map-tabs" aria-label="배경지도 선택">
       <button type="button" class="active" data-map="street">도로지도</button>
       <button type="button" data-map="light">밝은지도</button>
@@ -552,7 +552,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, INITIAL_VIEW_HEIGHT);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v43-river-line-compare-20260711";
+    const DATA_VERSION = "v44-dual-river-preload-20260711";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -729,6 +729,14 @@
     const calculatingZonePromises = new Map();
     let zoneCalculationQueue = Promise.resolve();
 
+    // 두 한강라인은 최초 로딩 때 동시에 내려받고, 각 기준의 조망 계산 결과를 별도 캐시한다.
+    const riverGeoJsonByMode = new Map();
+    const preparedRiverStateByMode = new Map();
+    const viewAnalysisCacheByMode = new Map();
+    let riverModesPreloadPromise = null;
+    let riverModesAnalysisPromise = null;
+    let riverModesReady = false;
+
     function setStatus(message) {
       if (!statusEl) return;
       statusEl.textContent = message;
@@ -747,9 +755,147 @@
       }
     }
 
+    function setRiverModeButtonsDisabled(disabled) {
+      for (const button of document.querySelectorAll("[data-river-mode]")) {
+        button.disabled = !!disabled;
+        button.style.opacity = disabled ? "0.55" : "1";
+        button.style.cursor = disabled ? "wait" : "pointer";
+      }
+    }
+
     function updateRiverModeNote() {
       if (!riverModeNoteEl) return;
-      riverModeNoteEl.textContent = `현재 기준: ${activeRiverConfig().label}`;
+      riverModeNoteEl.textContent = riverModesReady
+        ? `두 한강라인 계산 완료 · 현재 기준: ${activeRiverConfig().label}`
+        : `보수적·완화적 한강라인 동시 준비 중 · 현재 기준: ${activeRiverConfig().label}`;
+    }
+
+    function currentLoadedZoneIds() {
+      return currentZoneId === "ALL" ? ["2", "3", "4", "5"] : [currentZoneId];
+    }
+
+    async function preloadRiverModeFiles() {
+      if (riverGeoJsonByMode.size === Object.keys(RIVER_MODE_CONFIGS).length) {
+        return riverGeoJsonByMode;
+      }
+      if (!riverModesPreloadPromise) {
+        setRiverModeButtonsDisabled(true);
+        riverModesPreloadPromise = Promise.all(
+          Object.entries(RIVER_MODE_CONFIGS).map(async ([mode, config]) => {
+            const data = await fetchGeoJson(config.url);
+            riverGeoJsonByMode.set(mode, data);
+          })
+        ).then(() => riverGeoJsonByMode).catch((error) => {
+          riverModesPreloadPromise = null;
+          throw error;
+        });
+      }
+      return riverModesPreloadPromise;
+    }
+
+    function preparedRiverState(mode, zoneIds = currentLoadedZoneIds()) {
+      const data = riverGeoJsonByMode.get(mode);
+      if (!data) return null;
+      const extendMeters = getRiverExtendMeters();
+      const zoneKey = zoneIds.join(",");
+      const existing = preparedRiverStateByMode.get(mode);
+      if (existing && existing.extendMeters === extendMeters && existing.zoneKey === zoneKey) {
+        return existing;
+      }
+
+      const context = buildRiverContext(data, extendMeters);
+      const contextsByZone = new Map(zoneIds.map(zoneId => [zoneId, context]));
+      const state = {
+        data,
+        context,
+        contextsByZone,
+        extendMeters,
+        zoneKey
+      };
+      preparedRiverStateByMode.set(mode, state);
+      return state;
+    }
+
+    function activatePreparedRiverMode(mode, options = {}) {
+      const state = preparedRiverState(mode, options.zoneIds || currentLoadedZoneIds());
+      if (!state) throw new Error(`${mode} 한강라인이 아직 준비되지 않았습니다.`);
+
+      currentRiverMode = mode;
+      riverRawGeoJsonByZone.clear();
+      riverContextsByZone.clear();
+      for (const [zoneId, context] of state.contextsByZone.entries()) {
+        riverRawGeoJsonByZone.set(zoneId, state.data);
+        riverContextsByZone.set(zoneId, context);
+      }
+      riverRawGeoJson = state.data;
+      riverSegments = state.context.segments;
+      riverPoints = state.context.points;
+      riverLinesForDisplay = state.context.linesForDisplay;
+      activeRiverSegments = riverSegments;
+      activeRiverPoints = riverPoints;
+      lastRiverStats = state.context.stats;
+
+      setActiveRiverButton(mode);
+      updateRiverModeNote();
+      if (options.draw !== false) drawRiverLines();
+      return state;
+    }
+
+    function saveAnalysisCacheForMode(mode) {
+      viewAnalysisCacheByMode.set(mode, {
+        analysis: new Map(viewAnalysisByFid),
+        calculatedZones: new Set(calculatedZones)
+      });
+    }
+
+    function restoreAnalysisCacheForMode(mode) {
+      const cached = viewAnalysisCacheByMode.get(mode);
+      viewAnalysisByFid.clear();
+      calculatedZones.clear();
+      calculatingZonePromises.clear();
+      zoneCalculationQueue = Promise.resolve();
+      if (cached) {
+        for (const [fid, analysis] of cached.analysis.entries()) {
+          viewAnalysisByFid.set(fid, analysis);
+        }
+        for (const zoneId of cached.calculatedZones) {
+          calculatedZones.add(zoneId);
+        }
+      }
+      refreshLoadedDescriptions();
+      return !!cached;
+    }
+
+    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {
+      if (riverModesAnalysisPromise) return riverModesAnalysisPromise;
+      const zoneIds = currentLoadedZoneIds();
+      const originalMode = currentRiverMode;
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+
+      riverModesAnalysisPromise = (async () => {
+        await preloadRiverModeFiles();
+        viewAnalysisCacheByMode.clear();
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+          activatePreparedRiverMode(mode, { zoneIds, draw: false });
+          resetViewAnalysisCache();
+          setStatus(`${activeRiverConfig().label} 조망 계산 준비 중...`);
+          await analyzeViewsForZone(zoneId, { force: true });
+          saveAnalysisCacheForMode(mode);
+        }
+
+        activatePreparedRiverMode(originalMode, { zoneIds, draw: true });
+        restoreAnalysisCacheForMode(originalMode);
+        riverModesReady = true;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n전환 시 재로딩 없이 즉시 표시됩니다.\n현재 기준: ${activeRiverConfig().label}`);
+      })().finally(() => {
+        riverModesAnalysisPromise = null;
+      });
+
+      return riverModesAnalysisPromise;
     }
 
     function applyPublicBaseMap(mapId = "street") {
@@ -2951,76 +3097,45 @@
 
     async function switchRiverMode(mode) {
       if (!RIVER_MODE_CONFIGS[mode]) return;
-      if (mode === currentRiverMode && riverRawGeoJson) {
+      if (!riverModesReady) {
+        setStatus("두 한강라인의 조망 계산을 준비하는 중입니다. 완료 후 즉시 전환할 수 있습니다.");
+        if (riverModesAnalysisPromise) await riverModesAnalysisPromise;
+      }
+      if (!viewAnalysisCacheByMode.has(mode)) {
+        await prepareBothRiverModeAnalyses(currentZoneId);
+      }
+      if (mode === currentRiverMode) {
         setActiveRiverButton(mode);
         updateRiverModeNote();
-        setStatus(`${activeRiverConfig().label}이 이미 적용되어 있습니다.`);
         return;
       }
 
-      const zonesToRecalculate = new Set(calculatedZones);
-      const selectedZoneId = zoneIdFromEntity(viewer.selectedEntity);
-      if (selectedZoneId) zonesToRecalculate.add(selectedZoneId);
-      if (!zonesToRecalculate.size && currentZoneId !== "ALL") zonesToRecalculate.add(currentZoneId);
-      const loadedZoneIds = currentZoneId === "ALL" ? ["2", "3", "4", "5"] : [currentZoneId];
-
-      currentRiverMode = mode;
-      setActiveRiverButton(mode);
-      updateRiverModeNote();
-      setStatus(`${activeRiverConfig().label}으로 전환하는 중입니다.`);
-
+      const selectedEntity = viewer.selectedEntity;
       try {
-        const riverData = await fetchGeoJson(activeRiverUrl());
-        riverRawGeoJsonByZone.clear();
-        for (const zoneId of loadedZoneIds) {
-          riverRawGeoJsonByZone.set(zoneId, riverData);
-        }
-        riverRawGeoJson = riverData;
-        rebuildRiverContexts();
-        lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
-        drawRiverLines();
-        resetViewAnalysisCache();
-        refreshLoadedDescriptions();
+        activatePreparedRiverMode(mode, { zoneIds: currentLoadedZoneIds(), draw: true });
+        restoreAnalysisCacheForMode(mode);
 
-        for (const zoneId of zonesToRecalculate) {
-          await analyzeViewsForZone(zoneId, { force: true });
+        if (selectedEntity) {
+          drawSelectedSightLines(selectedEntity);
+          updateSelectionDetails(selectedEntity);
         }
-
-        setStatus(`${activeRiverConfig().label} 적용 완료\n${riverStatusText()}\n유닛 수: ${footprints.length}`);
-        if (viewer.selectedEntity) {
-          drawSelectedSightLines(viewer.selectedEntity);
-          updateSelectionDetails(viewer.selectedEntity);
-        }
-        updateFloorTotalAngle(viewer.selectedEntity);
+        updateFloorTotalAngle(selectedEntity);
+        setStatus(`${activeRiverConfig().label} 즉시 전환 로드 완료`);
       } catch (error) {
         setStatus(`${activeRiverConfig().label} 전환 실패: ${error.message}`);
       }
     }
 
     async function recalculateViews(message = "조망 계산 갱신 완료") {
-      if (!riverRawGeoJson) {
+      if (!riverGeoJsonByMode.size) {
         setStatus("한강라인 GeoJSON이 아직 로드되지 않았습니다.");
         return;
       }
 
-      const zonesToRecalculate = new Set(calculatedZones);
-      const selectedZoneId = zoneIdFromEntity(viewer.selectedEntity);
-      if (selectedZoneId) zonesToRecalculate.add(selectedZoneId);
-      if (!zonesToRecalculate.size && currentZoneId !== "ALL") zonesToRecalculate.add(currentZoneId);
-
-      rebuildRiverContexts();
-      lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
-      drawRiverLines();
-      resetViewAnalysisCache();
-      refreshLoadedDescriptions();
-
-      if (zonesToRecalculate.size) {
-        for (const zoneId of zonesToRecalculate) {
-          await analyzeViewsForZone(zoneId, { force: true });
-        }
-      }
-
-      setStatus(`${message}\n${riverStatusText()}\n유닛 수: ${footprints.length}\n계산 완료 구역: ${[...calculatedZones].map(zoneLabelForStatus).join(", ") || "없음"}`);
+      preparedRiverStateByMode.clear();
+      viewAnalysisCacheByMode.clear();
+      await prepareBothRiverModeAnalyses(currentZoneId);
+      setStatus(`${message}\n보수적·완화적 두 기준을 모두 다시 계산했습니다.\n현재 기준: ${activeRiverConfig().label}`);
       if (viewer.selectedEntity) {
         drawSelectedSightLines(viewer.selectedEntity);
         updateSelectionDetails(viewer.selectedEntity);
@@ -3383,50 +3498,34 @@
       const config = ZONE_CONFIGS[zoneId] || ZONE_CONFIGS["2"];
       currentZoneId = zoneId;
       setActiveZoneButton(zoneId);
-      setStatus(`${config.label} 데이터를 불러오는 중입니다.`);
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      setStatus(`${config.label} 데이터와 두 한강라인을 동시에 불러오는 중입니다.`);
+
       try {
-        let riverData;
-        let unitsData;
-        const currentRiverUrl = activeRiverUrl();
-        setActiveRiverButton(currentRiverMode);
-        updateRiverModeNote();
+        const zoneIds = config.zoneIds ? config.zoneIds.slice() : [zoneId];
+        const riverFilesPromise = preloadRiverModeFiles();
+        const unitsPromise = config.zoneIds
+          ? Promise.all(
+              zoneIds.map(async id => ({
+                zoneId: id,
+                data: await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)
+              }))
+            ).then(combineFeatureCollections)
+          : fetchGeoJson(config.unitsUrl).then(data =>
+              combineFeatureCollections([{ zoneId, data }])
+            );
 
-        if (config.zoneIds) {
-          const zoneConfigs = config.zoneIds.map(id => ({ id, ...ZONE_CONFIGS[id] }));
-          const unitCollections = await Promise.all(
-            zoneConfigs.map(async item => ({
-              zoneId: item.id,
-              data: await fetchGeoJson(item.unitsUrl)
-            }))
-          );
-          const uniqueRiverUrls = [currentRiverUrl];
-          const riverCollections = await Promise.all(
-            uniqueRiverUrls.map(async url => ({ data: await fetchGeoJson(url) }))
-          );
-          const riverDataByUrl = new Map(riverCollections.map(({ data }, index) => [uniqueRiverUrls[index], data]));
-          riverRawGeoJsonByZone.clear();
-          for (const item of zoneConfigs) {
-            riverRawGeoJsonByZone.set(item.id, riverDataByUrl.get(currentRiverUrl));
-          }
-          unitsData = combineFeatureCollections(unitCollections);
-          riverData = combineRiverCollections(riverCollections);
-        } else {
-          const [singleRiverData, singleUnitsData] = await Promise.all([
-            fetchGeoJson(currentRiverUrl),
-            fetchGeoJson(config.unitsUrl)
-          ]);
-          riverRawGeoJsonByZone.clear();
-          riverRawGeoJsonByZone.set(zoneId, singleRiverData);
-          unitsData = combineFeatureCollections([{ zoneId, data: singleUnitsData }]);
-          riverData = singleRiverData;
-        }
-
-        riverRawGeoJson = riverData;
-        rebuildRiverContexts();
-        lastRiverStats = prepareRiverSegments(riverRawGeoJson, getRiverExtendMeters());
-        drawRiverLines();
+        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
+        preparedRiverStateByMode.clear();
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
         await loadGeoJson(unitsData, config.label);
+        await prepareBothRiverModeAnalyses(zoneId);
       } catch (error) {
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
         setStatus(`${config.label} 로드 실패: ${error.message}`);
       }
     }
@@ -3581,6 +3680,7 @@
     });
 
     setActiveRiverButton(currentRiverMode);
+    setRiverModeButtonsDisabled(true);
     updateRiverModeNote();
     setTimeout(() => applyPublicBaseMap("street"), 300);
 
