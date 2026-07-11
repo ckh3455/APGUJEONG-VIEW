@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - calc-new-hangang-20260711
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -37,7 +40,17 @@ jobs:
       - name: Calculate view rates
         run: node calc_new_hangang_browser.mjs
 
+      - name: Upload calculation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-hangang-view-results
+          path: |
+            view_rate_new_hangang.json
+            view_rate_new_hangang_summary.csv
+            view_rate_new_hangang_detail.csv
+
       - name: Commit calculation results
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
