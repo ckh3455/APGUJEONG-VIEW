@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>압구정 조망 시뮬레이션</title><style>html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;font-family:Arial,"Malgun Gothic",sans-serif;background:#f8fafc;color:#334155}#m{padding:18px 22px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:700;white-space:pre-wrap}</style></head><body><div id="m">압구정 조망 시뮬레이션 v55를 불러오는 중입니다.</div><script>
+(async()=>{const m=document.getElementById('m');try{let s=await(await fetch('./index_v50_loader.html?v=20260711-55',{cache:'no-store'})).text();const rep=(id,body)=>{const re=new RegExp('(<script type="text/plain" id="'+id+'">)[\\s\\S]*?(<\\/script>)');if(!re.test(s))throw new Error(id+' 패치 블록 없음');s=s.replace(re,'$1\n'+body.trim()+'\n  $2')};s=s.replaceAll('v50','v55').replaceAll('20260711-50','20260711-55');
+const cacheOld='    let riverModesReady = false;\\n    const sharedCandidateDataByFid = new Map();\\n    let optimizedCalculationGeneration = 0;\\n    let optimizedAnalysisPromiseGeneration = -1;';
+const cacheNew='    let riverModesReady = false;\\n    const sharedCandidateDataByFid = new Map();\\n    let optimizedCalculationGeneration = 0;\\n    let optimizedAnalysisPromiseGeneration = -1;\\n    const completedZoneResultCache = new Map();\\n    let osmDeferredTimer = null;\\n\\n    function restoreCompletedZone(zoneId) {\\n      const key = normalizeZoneId(zoneId);\\n      const cached = completedZoneResultCache.get(key);\\n      if (!cached) return false;\\n      viewAnalysisByFid.clear();\\n      calculatedZones.clear();\\n      viewAnalysisCacheByMode.clear();\\n      sharedCandidateDataByFid.clear();\\n      for (const [mode, cache] of cached.byMode.entries()) {\\n        viewAnalysisCacheByMode.set(mode, {\\n          analysis: new Map(cache.analysis || []),\\n          calculatedZones: new Set(cache.calculatedZones || [key])\\n        });\\n      }\\n      currentZoneId = key;\\n      activatePreparedRiverMode(currentRiverMode, { zoneIds: [key], draw: true });\\n      restoreAnalysisCacheForMode(currentRiverMode);\\n      riverModesReady = true;\\n      setRiverModeButtonsDisabled(false);\\n      updateRiverModeNote();\\n      return true;\\n    }';
+if(!s.includes(cacheOld))throw new Error('구역 캐시 삽입 위치 없음');s=s.replace(cacheOld,cacheNew);
+const analysisOld=`        for (const [mode, analysis] of modeAnalysisMaps.entries()) {
+          viewAnalysisCacheByMode.set(mode, {
+            analysis,
+            calculatedZones: new Set([cacheKey])
+          });
+        }
+
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });`;
+const analysisNew=`        const completedByMode = new Map();
+        for (const [mode, analysis] of modeAnalysisMaps.entries()) {
+          const activeCache = {
+            analysis: new Map(analysis),
+            calculatedZones: new Set([cacheKey])
+          };
+          viewAnalysisCacheByMode.set(mode, activeCache);
+          completedByMode.set(mode, {
+            analysis: new Map(analysis),
+            calculatedZones: new Set([cacheKey])
+          });
+        }
+        completedZoneResultCache.set(cacheKey, { byMode: completedByMode });
+
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });`;
+if(!s.includes(analysisOld))throw new Error('계산 완료 캐시 저장 위치 없음');s=s.replace(analysisOld,analysisNew);
+const startOld='      const started = performance.now();';
+const startNew=`      const started = performance.now();
+      const previousRequestRenderMode = viewer.scene.requestRenderMode;
+      const previousMaximumRenderTimeChange = viewer.scene.maximumRenderTimeChange;
+      if (osmDeferredTimer) {
+        clearTimeout(osmDeferredTimer);
+        osmDeferredTimer = null;
+      }
+      if (osmBuildingsTileset) osmBuildingsTileset.show = false;
+      viewer.scene.requestRenderMode = true;
+      viewer.scene.maximumRenderTimeChange = Number.POSITIVE_INFINITY;`;
+if(!s.includes(startOld))throw new Error('계산 시작 최적화 위치 없음');s=s.replace(startOld,startNew);
+s=s.replace('        yieldEvery: 120','        yieldEvery: 240');
+const osmDoneOld=`        setTimeout(() => {
+          if (!osmBuildingsTileset && !osmBuildingsLoading) showOsmBuildings();
+        }, 300);`;
+if(s.includes(osmDoneOld))s=s.replace(osmDoneOld,'');
+const finallyOld=`      } finally {
+        clearInterval(progressTimer);
+      }`;
+const finallyNew=`      } finally {
+        clearInterval(progressTimer);
+        viewer.scene.requestRenderMode = previousRequestRenderMode;
+        viewer.scene.maximumRenderTimeChange = previousMaximumRenderTimeChange;
+        if (osmBuildingsTileset) {
+          osmBuildingsTileset.show = true;
+          viewer.scene.requestRender();
+        } else {
+          osmDeferredTimer = setTimeout(() => {
+            osmDeferredTimer = null;
+            if (!riverModesAnalysisPromise && !osmBuildingsTileset && !osmBuildingsLoading) showOsmBuildings();
+          }, 8000);
+        }
+      }`;
+if(!s.includes(finallyOld))throw new Error('계산 종료 최적화 위치 없음');s=s.replace(finallyOld,finallyNew);
+rep('updateRiverModeNotePatch',String.raw`
+    function updateRiverModeNote() {
+      if (!riverModeNoteEl) return;
+      if (currentZoneId === "ALL") {
+        riverModeNoteEl.textContent = "유닛 클릭 대기 · 계산 완료 구역은 경량 캐시에 유지됩니다.";
+        return;
+      }
+      riverModeNoteEl.textContent = riverModesReady
+        ? zoneLabelForStatus(currentZoneId) + " 계산 완료 · 재방문 시 즉시 복원 · 현재 기준: " + activeRiverConfig().label
+        : zoneLabelForStatus(currentZoneId) + " 전체 유닛 계산 중 · 3D 렌더링 일시 정지";
+    }`);
+rep('loadZonePatch',String.raw`
+    async function loadZone(zoneId) {
+      const requestedZoneId = zoneId || "ALL";
+      const config = ZONE_CONFIGS[requestedZoneId] || ZONE_CONFIGS.ALL;
+      if (unitsDataSource && footprints.length) {
+        currentZoneId = requestedZoneId;
+        setActiveZoneButton(requestedZoneId);
+        clearSelectedSightLines();
+        if (requestedZoneId !== "ALL" && restoreCompletedZone(requestedZoneId)) {
+          setStatus(config.label + " 저장 결과를 즉시 불러왔습니다.\n재계산하지 않습니다.");
+        } else {
+          setStatus(requestedZoneId === "ALL"
+            ? "전체 유닛 표시 중\n계산할 구역의 유닛을 클릭하세요.\n계산 완료 구역은 경량 캐시에 유지됩니다."
+            : config.label + " 유닛 클릭 대기\n버튼만으로는 계산하지 않습니다.\n" + config.label + " 안의 유닛을 클릭하면 해당 구역 전체를 계산합니다.");
+          updateRiverModeNote();
+        }
+        return;
+      }
+      const generation = ++optimizedCalculationGeneration;
+      currentZoneId = "ALL";
+      setActiveZoneButton("ALL");
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      setStatus("2·3·4·5구역 전체 유닛을 불러오는 중입니다.");
+      try {
+        const zoneIds = ["2", "3", "4", "5"];
+        const riverFilesPromise = preloadRiverModeFiles();
+        const unitsPromise = Promise.all(zoneIds.map(async id => ({zoneId:id,data:await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)}))).then(combineFeatureCollections);
+        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
+        if (generation !== optimizedCalculationGeneration) return;
+        preparedRiverStateByMode.clear();
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+        await loadGeoJson(unitsData, "전체");
+        if (generation !== optimizedCalculationGeneration) return;
+        currentZoneId = "ALL";
+        setActiveZoneButton("ALL");
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(true);
+        updateRiverModeNote();
+        setStatus("전체 지도 로드 완료\n어느 구역 유닛이든 클릭하면 해당 구역 전체를 계산합니다.\n완료된 구역은 경량 캐시에 유지됩니다.\n나머지 구역 유닛도 차폐물로 유지됩니다.");
+      } catch (error) {
+        if (generation !== optimizedCalculationGeneration) return;
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus("전체 지도 로드 실패: " + error.message);
+      }
+    }`);
+rep('selectionPatch',String.raw`
+    viewer.selectedEntityChanged.addEventListener(async (entity) => {
+      updateEyeFloorInput(entity);
+      clearSelectedSightLines();
+      if (!entity || !entity.polygon || !entity.fidValue) {
+        if (lastPickedHeightScreenPosition) setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
+        else updateSelectionDetails(null);
+        return;
+      }
+      showLegendForSelectedEntity(entity);
+      updateSelectionDetails(entity);
+      const clickedZoneId = zoneIdFromEntity(entity);
+      if (!clickedZoneId || !ZONE_CONFIGS[clickedZoneId]) {
+        setStatus("선택한 유닛의 구역을 확인하지 못했습니다.");
+        return;
+      }
+      const fid = String(entity.fidValue);
+      const sameZoneReady = currentZoneId === clickedZoneId && riverModesReady && viewAnalysisByFid.has(fid);
+      if (!sameZoneReady) {
+        if (currentZoneId !== clickedZoneId && riverModesAnalysisPromise) optimizedCalculationGeneration += 1;
+        currentZoneId = clickedZoneId;
+        setActiveZoneButton(clickedZoneId);
+        if (restoreCompletedZone(clickedZoneId)) {
+          setStatus(zoneLabelForStatus(clickedZoneId) + " 저장 결과를 즉시 불러왔습니다.\n재계산하지 않습니다.");
+        } else if (riverModesAnalysisPromise && optimizedAnalysisPromiseGeneration === optimizedCalculationGeneration) {
+          await riverModesAnalysisPromise;
+        } else {
+          optimizedCalculationGeneration += 1;
+          preparedRiverStateByMode.clear();
+          resetViewAnalysisCache();
+          riverModesReady = false;
+          setRiverModeButtonsDisabled(true);
+          updateRiverModeNote();
+          activatePreparedRiverMode(currentRiverMode, { zoneIds: [clickedZoneId], draw: true });
+          setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 시작\n보수적·완화적 전체 유닛과 전층을 계산합니다.\n계산 중 3D 렌더링을 일시 정지합니다.");
+          try {
+            await prepareBothRiverModeAnalyses(clickedZoneId);
+          } catch (error) {
+            setStatus(zoneLabelForStatus(clickedZoneId) + " 계산 실패: " + error.message);
+            return;
+          }
+        }
+      }
+      if (viewer.selectedEntity !== entity) return;
+      if (!viewAnalysisByFid.has(fid)) {
+        setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 결과를 준비하지 못했습니다.");
+        return;
+      }
+      drawSelectedSightLines(entity);
+      updateSelectionDetails(entity);
+      updateFloorTotalAngle(entity);
+    });`);
+document.open();document.write(s);document.close()}catch(e){console.error(e);m.textContent='앱 수정본을 불러오지 못했습니다.\n'+e.message}})();
+</script></body></html>
