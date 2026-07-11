@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <div id="bootMessage">압구정 조망 시뮬레이션 v46을 불러오는 중입니다.</div>
+  <div id="bootMessage">압구정 조망 시뮬레이션 v47을 불러오는 중입니다.</div>
 
   <script type="text/plain" id="collectFacadePatch">
     function collectFacadeCandidates(footprint) {
@@ -28,8 +28,6 @@
           let activeHit = null;
           let commonBlockerDistance = 0;
 
-          // 보수적·완화적 기준 모두 동일한 정수 각도 레이를 사용한다.
-          // 동일 방향의 차폐 판정 거리도 두 한강라인 중 더 먼 교차점까지 통일한다.
           for (const item of commonContexts) {
             const hit = nearestRayHit(sample.point, angle, item.context.segments);
             if (!hit || !Number.isFinite(hit.distance) || hit.distance <= 2) continue;
@@ -99,10 +97,7 @@
       if (!contexts.length) {
         contexts.push({
           mode: currentRiverMode,
-          context: {
-            segments: activeRiverSegments,
-            points: activeRiverPoints
-          }
+          context: { segments: activeRiverSegments, points: activeRiverPoints }
         });
       }
       return contexts;
@@ -161,11 +156,115 @@
     }
   </script>
 
+  <script type="text/plain" id="runZonePatch">
+    async function runZoneAnalysis(zoneId, options = {}) {
+      const generation = Number.isFinite(Number(options.generation))
+        ? Number(options.generation)
+        : zoneLoadGeneration;
+      if (generation !== zoneLoadGeneration) return false;
+
+      const normalizedZoneId = normalizeZoneId(zoneId);
+      const cacheKey = normalizedZoneId || "ALL";
+      const force = !!options.force;
+      if (!force && calculatedZones.has(cacheKey)) return true;
+      if (!riverSegments.length || !footprints.length) return false;
+
+      const targetFootprints = targetFootprintsForZone(cacheKey);
+      const label = zoneLabelForStatus(cacheKey);
+      if (!targetFootprints.length) {
+        if (generation === zoneLoadGeneration) setStatus(`${label} 계산 대상 유닛이 없습니다.`);
+        return false;
+      }
+
+      const startMs = performance.now();
+      let completed = 0;
+      let analyzed = 0;
+      setStatus(`${label} 조망 계산 중...\n유닛 폴리곤: 0/${targetFootprints.length}`);
+
+      for (const footprint of targetFootprints) {
+        if (generation !== zoneLoadGeneration) return false;
+        if (storeViewAnalysisForFootprint(footprint)) analyzed += 1;
+        completed += 1;
+        if (generation !== zoneLoadGeneration) return false;
+        if (completed % 2 === 0 || completed === targetFootprints.length) {
+          setStatus(`${label} 조망 계산 중...\n유닛 폴리곤: ${completed}/${targetFootprints.length}`);
+          await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+      }
+
+      if (generation !== zoneLoadGeneration) return false;
+      activeRiverSegments = riverSegments;
+      activeRiverPoints = riverPoints;
+      calculatedZones.add(cacheKey);
+      refreshLoadedDescriptions();
+      const seconds = ((performance.now() - startMs) / 1000).toFixed(1);
+      setStatus(`${label} 조망 계산 완료\n계산 대상: 유닛 폴리곤 ${targetFootprints.length}개\n계산 완료: ${analyzed}개\n소요: ${seconds}초`);
+      return true;
+    }
+  </script>
+
+  <script type="text/plain" id="prepareBothPatch">
+    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId, generation = zoneLoadGeneration) {
+      const zoneIds = currentLoadedZoneIds();
+      const analysisKey = `${normalizeZoneId(zoneId) || "ALL"}|${zoneIds.join(",")}|${generation}`;
+      if (riverModesAnalysisPromise && riverModesAnalysisZoneKey === analysisKey) {
+        return riverModesAnalysisPromise;
+      }
+
+      const originalMode = currentRiverMode;
+      riverModesReady = false;
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+
+      const promise = (async () => {
+        await preloadRiverModeFiles();
+        if (generation !== zoneLoadGeneration) return false;
+
+        viewAnalysisCacheByMode.clear();
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+          preparedRiverState(mode, zoneIds);
+        }
+
+        let modeIndex = 0;
+        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {
+          if (generation !== zoneLoadGeneration) return false;
+          modeIndex += 1;
+          activatePreparedRiverMode(mode, { zoneIds, draw: false });
+          resetViewAnalysisCache();
+          setStatus(`${zoneLabelForStatus(zoneId)} 두 기준 일괄 계산 중 (${modeIndex}/2)\n현재: ${activeRiverConfig().label}`);
+          const completed = await analyzeViewsForZone(zoneId, { force: true, generation });
+          if (!completed || generation !== zoneLoadGeneration) return false;
+          saveAnalysisCacheForMode(mode);
+        }
+
+        if (generation !== zoneLoadGeneration) return false;
+        activatePreparedRiverMode(originalMode, { zoneIds, draw: true });
+        restoreAnalysisCacheForMode(originalMode);
+        riverModesReady = true;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus(`${zoneLabelForStatus(zoneId)} 보수적·완화적 두 기준 계산 완료\n한강라인 버튼은 재계산 없이 저장 결과만 전환합니다.\n현재 기준: ${activeRiverConfig().label}`);
+        return true;
+      })();
+
+      riverModesAnalysisPromise = promise;
+      riverModesAnalysisZoneKey = analysisKey;
+
+      try {
+        return await promise;
+      } finally {
+        if (riverModesAnalysisPromise === promise) {
+          riverModesAnalysisPromise = null;
+          riverModesAnalysisZoneKey = null;
+        }
+      }
+    }
+  </script>
+
   <script type="text/plain" id="switchModePatch">
     async function switchRiverMode(mode) {
       if (!RIVER_MODE_CONFIGS[mode]) return;
 
-      // 한강라인 버튼은 계산 버튼이 아니다. 구역 선택 때 시작한 두 기준 계산만 기다린다.
       if (!riverModesReady && riverModesAnalysisPromise) {
         setStatus(`${zoneLabelForStatus(currentZoneId)} 보수적·완화적 계산을 함께 진행 중입니다.\n완료 후 자동으로 전환합니다.`);
         await riverModesAnalysisPromise;
@@ -186,7 +285,6 @@
       try {
         activatePreparedRiverMode(mode, { zoneIds: currentLoadedZoneIds(), draw: true });
         restoreAnalysisCacheForMode(mode);
-
         if (selectedEntity) {
           drawSelectedSightLines(selectedEntity);
           updateSelectionDetails(selectedEntity);
@@ -199,9 +297,60 @@
     }
   </script>
 
+  <script type="text/plain" id="loadZonePatch">
+    async function loadZone(zoneId) {
+      const generation = ++zoneLoadGeneration;
+      const config = ZONE_CONFIGS[zoneId] || ZONE_CONFIGS["2"];
+      currentZoneId = zoneId;
+      setActiveZoneButton(zoneId);
+
+      riverModesReady = false;
+      riverModesAnalysisPromise = null;
+      riverModesAnalysisZoneKey = null;
+      viewAnalysisCacheByMode.clear();
+      calculatedZones.clear();
+      calculatingZonePromises.clear();
+      zoneCalculationQueue = Promise.resolve();
+      setRiverModeButtonsDisabled(true);
+      updateRiverModeNote();
+      setStatus(`${config.label} 데이터와 두 한강라인을 동시에 불러오는 중입니다.`);
+
+      try {
+        const zoneIds = config.zoneIds ? config.zoneIds.slice() : [zoneId];
+        const riverFilesPromise = preloadRiverModeFiles();
+        const unitsPromise = config.zoneIds
+          ? Promise.all(
+              zoneIds.map(async id => ({
+                zoneId: id,
+                data: await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)
+              }))
+            ).then(combineFeatureCollections)
+          : fetchGeoJson(config.unitsUrl).then(data =>
+              combineFeatureCollections([{ zoneId, data }])
+            );
+
+        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
+        if (generation !== zoneLoadGeneration) return;
+
+        preparedRiverStateByMode.clear();
+        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
+        await loadGeoJson(unitsData, config.label);
+        if (generation !== zoneLoadGeneration) return;
+
+        await prepareBothRiverModeAnalyses(zoneId, generation);
+      } catch (error) {
+        if (generation !== zoneLoadGeneration) return;
+        riverModesReady = false;
+        setRiverModeButtonsDisabled(false);
+        updateRiverModeNote();
+        setStatus(`${config.label} 로드 실패: ${error.message}`);
+      }
+    }
+  </script>
+
   <script>
     (() => {
-      const BASE_FILE = "./index_v44_base.html?v=20260711-46";
+      const BASE_FILE = "./index_v44_base.html?v=20260711-47";
       const message = document.getElementById("bootMessage");
 
       function replaceOnce(source, before, after, label) {
@@ -225,13 +374,13 @@
         source = replaceOnce(
           source,
           '<div class="hint">버전: v44 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
-          '<div class="hint">버전: v46 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
+          '<div class="hint">버전: v47 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>',
           "버전"
         );
         source = replaceOnce(
           source,
           'const DATA_VERSION = "v44-dual-river-preload-20260711";',
-          'const DATA_VERSION = "v46-zone-dual-cache-20260711";',
+          'const DATA_VERSION = "v47-zone-cancel-20260711";',
           "데이터 버전"
         );
 
@@ -242,88 +391,23 @@
         source = replaceOnce(
           source,
           '    let riverModesAnalysisPromise = null;\n    let riverModesReady = false;',
-          '    let riverModesAnalysisPromise = null;\n    let riverModesAnalysisZoneKey = null;\n    let riverModesReady = false;',
-          "구역별 계산 키"
-        );
-
-        const preparePrefixOld = [
-          '    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {',
-          '      if (riverModesAnalysisPromise) return riverModesAnalysisPromise;',
-          '      const zoneIds = currentLoadedZoneIds();',
-          '      const originalMode = currentRiverMode;'
-        ].join("\n");
-        const preparePrefixNew = [
-          '    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {',
-          '      const zoneIds = currentLoadedZoneIds();',
-          '      const analysisKey = `${normalizeZoneId(zoneId) || "ALL"}|${zoneIds.join(",")}`;',
-          '      if (riverModesAnalysisPromise) {',
-          '        if (riverModesAnalysisZoneKey === analysisKey) return riverModesAnalysisPromise;',
-          '        await riverModesAnalysisPromise;',
-          '      }',
-          '      const originalMode = currentRiverMode;',
-          '      riverModesAnalysisZoneKey = analysisKey;'
-        ].join("\n");
-        source = replaceOnce(source, preparePrefixOld, preparePrefixNew, "구역별 두 기준 계산");
-
-        const prepareOld = [
-          "        await preloadRiverModeFiles();",
-          "        viewAnalysisCacheByMode.clear();",
-          "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {"
-        ].join("\n");
-        const prepareNew = [
-          "        await preloadRiverModeFiles();",
-          "        viewAnalysisCacheByMode.clear();",
-          "",
-          "        // 구역 버튼 한 번으로 두 한강라인 컨텍스트와 계산 결과를 모두 준비한다.",
-          "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {",
-          "          preparedRiverState(mode, zoneIds);",
-          "        }",
-          "",
-          "        let modeIndex = 0;",
-          "        for (const mode of Object.keys(RIVER_MODE_CONFIGS)) {",
-          "          modeIndex += 1;"
-        ].join("\n");
-        source = replaceOnce(source, prepareOld, prepareNew, "두 기준 일괄 준비");
-
-        source = replaceOnce(
-          source,
-          '          setStatus(`${activeRiverConfig().label} 조망 계산 준비 중...`);',
-          '          setStatus(`${zoneLabelForStatus(zoneId)} 두 기준 일괄 계산 중 (${modeIndex}/2)\\n현재: ${activeRiverConfig().label}`);',
-          "두 기준 진행 표시"
-        );
-
-        source = replaceOnce(
-          source,
-          '      })().finally(() => {\n        riverModesAnalysisPromise = null;\n      });',
-          '      })().finally(() => {\n        riverModesAnalysisPromise = null;\n        riverModesAnalysisZoneKey = null;\n      });',
-          "계산 키 정리"
+          '    let riverModesAnalysisPromise = null;\n    let riverModesAnalysisZoneKey = null;\n    let zoneLoadGeneration = 0;\n    let riverModesReady = false;',
+          "구역 전환 취소 상태"
         );
 
         const collectPatch = document.getElementById("collectFacadePatch").textContent.replace(/^\n/, "").trimEnd();
         const anglePatch = document.getElementById("angleScanPatch").textContent.replace(/^\n/, "").trimEnd();
+        const runZonePatch = document.getElementById("runZonePatch").textContent.replace(/^\n/, "").trimEnd();
+        const prepareBothPatch = document.getElementById("prepareBothPatch").textContent.replace(/^\n/, "").trimEnd();
         const switchPatch = document.getElementById("switchModePatch").textContent.replace(/^\n/, "").trimEnd();
+        const loadZonePatch = document.getElementById("loadZonePatch").textContent.replace(/^\n/, "").trimEnd();
 
-        source = replaceBlock(
-          source,
-          "    function collectFacadeCandidates(footprint) {",
-          "    function summarizeFacadeCandidates",
-          collectPatch,
-          "공통 레이 계산"
-        );
-        source = replaceBlock(
-          source,
-          "    function angularScanForRiver(origin) {",
-          "    function normalizeZoneId",
-          anglePatch,
-          "공통 각도망"
-        );
-        source = replaceBlock(
-          source,
-          "    async function switchRiverMode(mode) {",
-          "    async function recalculateViews",
-          switchPatch,
-          "한강라인 저장 결과 전환"
-        );
+        source = replaceBlock(source, "    function collectFacadeCandidates(footprint) {", "    function summarizeFacadeCandidates", collectPatch, "공통 레이 계산");
+        source = replaceBlock(source, "    function angularScanForRiver(origin) {", "    function normalizeZoneId", anglePatch, "공통 각도망");
+        source = replaceBlock(source, "    async function runZoneAnalysis(zoneId, options = {}) {", "    function analyzeViewsForZone", runZonePatch, "구역 계산 취소");
+        source = replaceBlock(source, "    async function prepareBothRiverModeAnalyses(zoneId = currentZoneId) {", "    function applyPublicBaseMap", prepareBothPatch, "두 기준 일괄 계산");
+        source = replaceBlock(source, "    async function switchRiverMode(mode) {", "    async function recalculateViews", switchPatch, "한강라인 저장 결과 전환");
+        source = replaceBlock(source, "    async function loadZone(zoneId) {", "    function applyVworldBaseMap", loadZonePatch, "구역 로드 취소");
 
         const entityCalcOld = [
           '      if (!viewAnalysisByFid.has(fid)) {',
@@ -339,10 +423,6 @@
           '      }'
         ].join("\n");
         source = replaceOnce(source, entityCalcOld, entityCalcNew, "유닛 클릭 재계산 방지");
-
-        const statusOld = '        setStatus(`보수적·완화적 한강라인 동시 로드 완료\n전환 시 재로딩 없이 즉시 표시됩니다.\n현재 기준: ${activeRiverConfig().label}`);';
-        const statusNew = '        setStatus(`${zoneLabelForStatus(zoneId)} 보수적·완화적 두 기준 계산 완료\n한강라인 버튼은 재계산 없이 저장 결과만 전환합니다.\n현재 기준: ${activeRiverConfig().label}`);';
-        if (source.includes(statusOld)) source = source.replace(statusOld, statusNew);
 
         document.open();
         document.write(source);
