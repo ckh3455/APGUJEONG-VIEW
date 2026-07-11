@@ -1,0 +1,81 @@
+name: Calculate new Han River view rates
+
+on:
+  push:
+    branches:
+      - calc-new-hangang-20260711
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  calculate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout calculation branch
+        uses: actions/checkout@v4
+        with:
+          ref: calc-new-hangang-20260711
+
+      - name: Update app version and date
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace(
+              '<div class="hint">버전: v41 / <strong>정밀도면이 아닙니다</strong></div>',
+              '<div class="hint">버전: v42 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>'
+          )
+          s = s.replace(
+              'const DATA_VERSION = "v41-new-hangang-line-20260711";',
+              'const DATA_VERSION = "v42-new-hangang-analysis-20260711";'
+          )
+          s = s.replace(
+              'const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-2";',
+              'const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-3";'
+          )
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright@1.53.2
+          npx playwright install --with-deps chromium
+
+      - name: Start local server
+        run: |
+          python3 -m http.server 8000 > /tmp/apgujeong-http.log 2>&1 &
+          echo $! > /tmp/apgujeong-http.pid
+          sleep 3
+
+      - name: Calculate view rates
+        run: node calc_new_hangang_browser.mjs
+
+      - name: Upload calculation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-hangang-view-results
+          path: |
+            view_rate_new_hangang.json
+            view_rate_new_hangang_summary.csv
+            view_rate_new_hangang_detail.csv
+
+      - name: Commit app and calculation results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html view_rate_new_hangang.json view_rate_new_hangang_summary.csv view_rate_new_hangang_detail.csv
+          git commit -m "Update app to v42 and add new Han River results [skip calc]" || exit 0
+          git push origin HEAD:calc-new-hangang-20260711

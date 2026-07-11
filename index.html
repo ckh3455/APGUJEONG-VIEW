@@ -481,7 +481,7 @@
 
   <div class="panel">
     <h1>압구정 조망 시뮬레이션</h1>
-    <div class="hint">버전: v41 / <strong>정밀도면이 아닙니다</strong></div>
+    <div class="hint">버전: v42 · 업데이트: 2026.07.11 / <strong>정밀도면이 아닙니다</strong></div>
     <div class="zone-tabs" aria-label="구역 선택">
       <button type="button" class="active" data-zone="ALL">전체</button>
       <button type="button" data-zone="2">2구역</button>
@@ -530,7 +530,7 @@
     const APGUJEONG_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, INITIAL_VIEW_HEIGHT);
     const APGUJEONG_ROTATE_CENTER = Cesium.Cartesian3.fromDegrees(127.03255, 37.52545, 80);
     const AUTO_ROTATE_SPEED_DEG_PER_SEC = 8;
-    const DATA_VERSION = "v41-new-hangang-line-20260711";
+    const DATA_VERSION = "v42-new-hangang-analysis-20260711";
     const ANGLE_OPEN_RATIO_THRESHOLD = 0.5;
     const BLOCKER_PENTHOUSE_FLOORS = 1;
     const SAME_DONG_CORE_GAP_M = 10;
@@ -540,7 +540,7 @@
       "apgujeong_osm_clipping_zones.geojson"
     ];
     const OSM_BUILDING_VERTICAL_OFFSET_M = Number(new URLSearchParams(window.location.search).get("osmOffset") || -62);
-    const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-2";
+    const ALL_RIVER_URL = "hangang_line_new.geojson?v=20260711-3";
     const ZONE_CONFIGS = {
       "ALL": {
         label: "전체",
