@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-12T12:09:53.282Z",
+  "generatedAt": "2026-07-12T12:57:57.146Z",
   "method": {
     "riverLine": "hangang_line_all.geojson (보수적)",
     "sampleStepM": 8,
@@ -14,6 +14,62 @@
       "E급": "20 이하"
     },
     "blockers": "2·3·4·5구역 전체 현 위치 차폐 반영"
+  },
+  "inspection": {
+    "zone2Types79and87": [
+      {
+        "id": "2-23",
+        "dong": "105",
+        "unitType": "79",
+        "floors": 65,
+        "weight": 1,
+        "height": 236.288,
+        "center": [
+          127.02443664014828,
+          37.527522218281995
+        ],
+        "propertyFid": 23
+      },
+      {
+        "id": "2-24",
+        "dong": "105",
+        "unitType": "87",
+        "floors": 65,
+        "weight": 1,
+        "height": 236.288,
+        "center": [
+          127.02463353455096,
+          37.52757131061347
+        ],
+        "propertyFid": 24
+      },
+      {
+        "id": "2-43",
+        "dong": "108",
+        "unitType": "79",
+        "floors": 64,
+        "weight": 1,
+        "height": 246.288,
+        "center": [
+          127.02487542628552,
+          37.52864620828492
+        ],
+        "propertyFid": 43
+      },
+      {
+        "id": "2-44",
+        "dong": "108",
+        "unitType": "87",
+        "floors": 64,
+        "weight": 1,
+        "height": 246.288,
+        "center": [
+          127.02478344278933,
+          37.52881024122007
+        ],
+        "propertyFid": 44
+      }
+    ]
   },
   "zones": {
     "2": {
