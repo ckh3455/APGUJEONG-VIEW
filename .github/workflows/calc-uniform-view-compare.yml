@@ -1,0 +1,40 @@
+name: Calculate zone 2 uniform layout comparison
+
+on:
+  push:
+    branches:
+      - analysis/uniform-view-compare
+    paths:
+      - tools/calc_uniform_compare.js
+      - .github/workflows/calc-uniform-view-compare.yml
+
+permissions:
+  contents: write
+
+jobs:
+  calculate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: analysis/uniform-view-compare
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run comparison
+        run: node tools/calc_uniform_compare.js
+
+      - name: Commit results to analysis branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add analysis_results/zone2_uniform_view_compare.json analysis_results/apgujeong_2_units_uniform.geojson
+          if git diff --cached --quiet; then
+            echo "No result changes"
+          else
+            git commit -m "Add zone 2 uniform layout comparison results"
+            git push origin HEAD:analysis/uniform-view-compare
+          fi
