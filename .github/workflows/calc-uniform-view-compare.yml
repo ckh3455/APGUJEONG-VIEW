@@ -1,4 +1,4 @@
-name: Calculate zone 2 uniform layout comparison
+name: Calculate zone 2 layout comparisons
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     paths:
       - tools/calc_uniform_compare.js
       - tools/run_uniform_compare_v2.js
+      - tools/run_view_preserving_compare.js
       - .github/workflows/calc-uniform-view-compare.yml
 
 permissions:
@@ -25,17 +26,21 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run comparison
+      - name: Run uniform comparison
         run: node tools/run_uniform_compare_v2.js
+
+      - name: Run view-preserving comparison
+        run: node tools/run_view_preserving_compare.js
 
       - name: Commit results to analysis branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add analysis_results/zone2_uniform_view_compare.json analysis_results/apgujeong_2_units_uniform.geojson
+          git add analysis_results/zone2_view_preserving_compare.json analysis_results/apgujeong_2_units_view_preserving.geojson
           if git diff --cached --quiet; then
             echo "No result changes"
           else
-            git commit -m "Update zone 2 collision-safe uniform layout results"
+            git commit -m "Update zone 2 layout comparison results"
             git push origin HEAD:analysis/uniform-view-compare
           fi
