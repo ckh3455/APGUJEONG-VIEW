@@ -6,9 +6,9 @@ function analyzeZoneScenario(footprints, river, targetZone){
   const targets=footprints.filter(f=>f.zoneId===targetZone);let idx=0;
   for(const fp of targets){
     idx++;
-    const g=gmap.get(\`${targetZone}:\${fp.dong}\`),profiles=candidateProfiles(fp,g,groups,river);
+    const g=gmap.get(targetZone+':'+fp.dong),profiles=candidateProfiles(fp,g,groups,river);
     for(let floor=1;floor<=fp.floors;floor++) records.push({id:fp.id,zone:targetZone,dong:fp.dong,unitType:fp.unitType||'미표기',floor,weight:fp.weight,angle:openAngle(profiles,eyeHeight(fp,floor))});
-    if(idx%10===0) console.error(\`zone \${targetZone}: analyzed \${idx}/\${targets.length}\`);
+    if(idx%10===0) console.error('zone '+targetZone+': analyzed '+idx+'/'+targets.length);
   }
   return records;
 }
