@@ -7,6 +7,12 @@ on:
     paths:
       - tools/run_conservative_grade_by_unit_type.js
       - .github/workflows/calc-conservative-grade-report.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/run_conservative_grade_by_unit_type.js
+      - .github/workflows/calc-conservative-grade-report.yml
 
 permissions:
   contents: write
@@ -27,7 +33,16 @@ jobs:
       - name: Run conservative grade report
         run: node tools/run_conservative_grade_by_unit_type.js
 
-      - name: Commit results
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conservative-grade-report
+          path: |
+            analysis_results/conservative_grade_by_zone_unit_type.json
+            analysis_results/conservative_grade_by_zone_unit_type.csv
+
+      - name: Commit results to analysis branch
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
