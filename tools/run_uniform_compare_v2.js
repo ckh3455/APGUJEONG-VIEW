@@ -5,7 +5,7 @@ function createUniformLayout(zone2Groups,boundary){
   const moved=zone2Groups.map(g=>({...g,center:{...g.center},hull:g.hull.map(p=>({...p}))}));
   const xs=boundary.map(p=>p.x),ys=boundary.map(p=>p.y),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
   const samples=[];
-  for(let x=minX;x<=maxX;x+=18)for(let y=minY;y<=maxY;y+=18){const p={x,y};if(pointInPoly(p,boundary))samples.push(p);}
+  for(let x=minX;x<=maxX;x+=24)for(let y=minY;y<=maxY;y+=24){const p={x,y};if(pointInPoly(p,boundary))samples.push(p);}
   const movedHull=(g,d)=>g.hull.map(p=>add(p,d));
   const valid=(index,d)=>{
     const nh=movedHull(moved[index],d);
@@ -20,23 +20,20 @@ function createUniformLayout(zone2Groups,boundary){
   };
   const score=()=>{const s=layoutStats(moved),c=coverage();return s.cv*260+c.mean*.65+c.max*1.15-s.min*1.8-s.avg*.25;};
   let currentScore=score();
-  for(let iter=0;iter<260;iter++){
+  for(let iter=0;iter<90;iter++){
     const cells=Array.from({length:moved.length},()=>({x:0,y:0,n:0}));
     for(const p of samples){let bi=0,bd=Infinity;for(let i=0;i<moved.length;i++){const d=dist(p,moved[i].center);if(d<bd){bd=d;bi=i;}}cells[bi].x+=p.x;cells[bi].y+=p.y;cells[bi].n++;}
-    const order=[...moved.keys()].sort((a,b)=>((iter+a)%moved.length)-((iter+b)%moved.length));
-    for(const i of order){
-      const g=moved[i],cell=cells[i];if(!cell.n)continue;
-      const target={x:cell.x/cell.n,y:cell.y/cell.n};let force=mul(sub(target,g.center),.22);
+    for(let stepIndex=0;stepIndex<moved.length;stepIndex++){
+      const i=(iter+stepIndex)%moved.length,g=moved[i],cell=cells[i];if(!cell.n)continue;
+      const target={x:cell.x/cell.n,y:cell.y/cell.n};let force=mul(sub(target,g.center),.24);
       for(let j=0;j<moved.length;j++)if(i!==j){const q=sub(g.center,moved[j].center),d=Math.hypot(q.x,q.y);if(d>0&&d<95){const strength=(95-d)/95*4.5;force=add(force,mul(q,strength/d));}}
       const mag=Math.hypot(force.x,force.y);if(mag>7)force=mul(force,7/mag);
-      let accepted=false;
-      for(const scale of [1,.65,.4,.22]){const d=mul(force,scale);if(!valid(i,d))continue;const oldC=g.center,oldH=g.hull;g.center=add(g.center,d);g.hull=oldH.map(p=>add(p,d));const ns=score();if(ns<currentScore-.0001){currentScore=ns;accepted=true;break;}g.center=oldC;g.hull=oldH;}
-      if(!accepted)continue;
+      for(const scale of [1,.65,.4,.22]){const d=mul(force,scale);if(!valid(i,d))continue;const oldC=g.center,oldH=g.hull;g.center=add(g.center,d);g.hull=oldH.map(p=>add(p,d));const ns=score();if(ns<currentScore-.0001){currentScore=ns;break;}g.center=oldC;g.hull=oldH;}
     }
   }
   let seed=246813579;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-  for(let iter=0;iter<5000;iter++){
-    const i=Math.floor(rnd()*moved.length),step=10*(1-iter/5000)+.8,a=rnd()*Math.PI*2,d={x:Math.cos(a)*step,y:Math.sin(a)*step};if(!valid(i,d))continue;
+  for(let iter=0;iter<1400;iter++){
+    const i=Math.floor(rnd()*moved.length),step=9*(1-iter/1400)+.8,a=rnd()*Math.PI*2,d={x:Math.cos(a)*step,y:Math.sin(a)*step};if(!valid(i,d))continue;
     const g=moved[i],oldC=g.center,oldH=g.hull;g.center=add(g.center,d);g.hull=oldH.map(p=>add(p,d));const ns=score();if(ns<currentScore){currentScore=ns;}else{g.center=oldC;g.hull=oldH;}
   }
   let outside=0,overlaps=0,clearDef=0;for(const g of moved)for(const p of g.hull)if(!pointInPoly(p,boundary))outside++;
