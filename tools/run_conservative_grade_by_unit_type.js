@@ -31,7 +31,8 @@ function gradeReportMain(){
   const files={2:'apgujeong_2_units.geojson',3:'apg3_unit_polygon.geojson',4:'apgujeong_4_units.geojson',5:'apgujeong_5_units.geojson'};
   const base=Object.entries(files).flatMap(([z,f])=>prepareFeatures(z,f));
   const river=buildRiver(loadJson('hangang_line_all.geojson'));
-  const report={generatedAt:new Date().toISOString(),method:{riverLine:'hangang_line_all.geojson (보수적)',sampleStepM:SAMPLE_STEP_M,angleStepDeg:ANGLE_STEP_DEG,weight:'평형 피처의 unit_type 쉼표 분리 개수 × 층수',grades:{'특A급':'100 이상','A급':'81~99','B급':'61~80','C급':'41~60','D급':'21~40','E급':'20 이하'},blockers:'2·3·4·5구역 전체 현 위치 차폐 반영'},zones:{}};
+  const inspect79_87=base.filter(f=>f.zoneId==='2'&&(f.unitType==='79'||f.unitType==='87')).map(f=>({id:f.id,dong:f.dong,unitType:f.unitType,floors:f.floors,weight:f.weight,height:f.height,center:ll(f.center),propertyFid:f.props.fid}));
+  const report={generatedAt:new Date().toISOString(),method:{riverLine:'hangang_line_all.geojson (보수적)',sampleStepM:SAMPLE_STEP_M,angleStepDeg:ANGLE_STEP_DEG,weight:'평형 피처의 unit_type 쉼표 분리 개수 × 층수',grades:{'특A급':'100 이상','A급':'81~99','B급':'61~80','C급':'41~60','D급':'21~40','E급':'20 이하'},blockers:'2·3·4·5구역 전체 현 위치 차폐 반영'},inspection:{zone2Types79and87:inspect79_87},zones:{}};
   const csv=[['구역','평형','계산단위','평균조망각','특A급','A급','B급','C급','D급','E급']];
   for(const z of ['2','3','4','5']){
     console.error('Calculating zone '+z+'...');
@@ -47,7 +48,7 @@ function gradeReportMain(){
   fs.mkdirSync(OUT_DIR,{recursive:true});
   fs.writeFileSync(path.join(OUT_DIR,'conservative_grade_by_zone_unit_type.json'),JSON.stringify(report,null,2));
   fs.writeFileSync(path.join(OUT_DIR,'conservative_grade_by_zone_unit_type.csv'),'\ufeff'+csv.map(row=>row.map(v=>{const s=String(v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n'));
-  console.log(JSON.stringify(report.zones,null,2));
+  console.log(JSON.stringify({inspection:report.inspection,zones:report.zones},null,2));
 }
 `;
 source = source.replace(/\nmain\(\);\s*$/, '\n'+custom+'\ngradeReportMain();\n');
