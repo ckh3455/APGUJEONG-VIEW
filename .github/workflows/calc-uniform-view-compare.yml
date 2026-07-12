@@ -8,6 +8,7 @@ on:
       - tools/calc_uniform_compare.js
       - tools/run_uniform_compare_v2.js
       - tools/run_view_preserving_compare.js
+      - tools/run_conservative_grade_by_unit_type.js
       - .github/workflows/calc-uniform-view-compare.yml
 
 permissions:
@@ -26,7 +27,7 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Run uniform comparison
+      - name: Run uniform comparison and conservative grade report
         run: node tools/run_uniform_compare_v2.js
 
       - name: Run view-preserving comparison
@@ -38,9 +39,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add analysis_results/zone2_uniform_view_compare.json analysis_results/apgujeong_2_units_uniform.geojson
           git add analysis_results/zone2_view_preserving_compare.json analysis_results/apgujeong_2_units_view_preserving.geojson
+          git add analysis_results/conservative_grade_by_zone_unit_type.json analysis_results/conservative_grade_by_zone_unit_type.csv
           if git diff --cached --quiet; then
             echo "No result changes"
           else
-            git commit -m "Update zone 2 layout comparison results"
+            git commit -m "Update layout comparisons and conservative grade report"
             git push origin HEAD:analysis/uniform-view-compare
           fi
