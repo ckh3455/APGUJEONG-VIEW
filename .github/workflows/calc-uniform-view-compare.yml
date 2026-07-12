@@ -6,6 +6,7 @@ on:
       - analysis/uniform-view-compare
     paths:
       - tools/calc_uniform_compare.js
+      - tools/run_uniform_compare_v2.js
       - .github/workflows/calc-uniform-view-compare.yml
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           node-version: '20'
 
       - name: Run comparison
-        run: node tools/calc_uniform_compare.js
+        run: node tools/run_uniform_compare_v2.js
 
       - name: Commit results to analysis branch
         run: |
@@ -35,6 +36,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No result changes"
           else
-            git commit -m "Add zone 2 uniform layout comparison results"
+            git commit -m "Update zone 2 collision-safe uniform layout results"
             git push origin HEAD:analysis/uniform-view-compare
           fi
