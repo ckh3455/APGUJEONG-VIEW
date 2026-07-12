@@ -1,0 +1,40 @@
+name: Calculate conservative view grades by zone and unit type
+
+on:
+  push:
+    branches:
+      - analysis/uniform-view-compare
+    paths:
+      - tools/run_conservative_grade_by_unit_type.js
+      - .github/workflows/calc-conservative-grade-report.yml
+
+permissions:
+  contents: write
+
+jobs:
+  calculate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: analysis/uniform-view-compare
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run conservative grade report
+        run: node tools/run_conservative_grade_by_unit_type.js
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add analysis_results/conservative_grade_by_zone_unit_type.json analysis_results/conservative_grade_by_zone_unit_type.csv
+          if git diff --cached --quiet; then
+            echo "No result changes"
+          else
+            git commit -m "Add conservative grade report by zone and unit type"
+            git push origin HEAD:analysis/uniform-view-compare
+          fi
