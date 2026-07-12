@@ -45,3 +45,4 @@ function createUniformLayout(zone2Groups,boundary){
 source = source.replace(/function createUniformLayout\([\s\S]*?\n}\nfunction analyzeScenario/, replacement + '\nfunction analyzeScenario');
 source = source.replace("2구역 동 형상·방향·층수 유지, 동 전체를 4/3 엇갈림 계열 격자 목표점으로 평행이동, 기존 위치와의 이동비용 최소화", "2구역 동 형상·방향·층수 유지, 현재 위치에서 시작해 경계와 동간 비겹침을 준수하며 centroidal-Voronoi와 충돌회피 국소탐색으로 균등 분산");
 new Function('require','process','console',source)(require,process,console);
+require('./run_conservative_grade_by_unit_type.js');
