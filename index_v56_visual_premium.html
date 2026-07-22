@@ -1,179 +1,23 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>압구정 조망 시뮬레이션 V56 프리미엄</title><style>html,body{width:100%;height:100%;margin:0}body{display:grid;place-items:center;font-family:Arial,"Malgun Gothic",sans-serif;background:#f8fafc;color:#334155}#m{padding:18px 22px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:700;white-space:pre-wrap}</style></head><body><div id="m">압구정 조망 시뮬레이션 V56 프리미엄 시험판을 불러오는 중입니다.</div><script>
-(async()=>{const m=document.getElementById('m');try{let s=await(await fetch('./index_v50_loader.html?v=20260711-55',{cache:'no-store'})).text();const rep=(id,body)=>{const re=new RegExp('(<script type="text/plain" id="'+id+'">)[\\s\\S]*?(<\\/script>)');if(!re.test(s))throw new Error(id+' 패치 블록 없음');s=s.replace(re,'$1\n'+body.trim()+'\n  $2')};s=s.replaceAll('v50','v55').replaceAll('20260711-50','20260711-55');
-const cacheOld='    let riverModesReady = false;\\n    const sharedCandidateDataByFid = new Map();\\n    let optimizedCalculationGeneration = 0;\\n    let optimizedAnalysisPromiseGeneration = -1;';
-const cacheNew='    let riverModesReady = false;\\n    const sharedCandidateDataByFid = new Map();\\n    let optimizedCalculationGeneration = 0;\\n    let optimizedAnalysisPromiseGeneration = -1;\\n    const completedZoneResultCache = new Map();\\n    let osmDeferredTimer = null;\\n\\n    function restoreCompletedZone(zoneId) {\\n      const key = normalizeZoneId(zoneId);\\n      const cached = completedZoneResultCache.get(key);\\n      if (!cached) return false;\\n      viewAnalysisByFid.clear();\\n      calculatedZones.clear();\\n      viewAnalysisCacheByMode.clear();\\n      sharedCandidateDataByFid.clear();\\n      for (const [mode, cache] of cached.byMode.entries()) {\\n        viewAnalysisCacheByMode.set(mode, {\\n          analysis: new Map(cache.analysis || []),\\n          calculatedZones: new Set(cache.calculatedZones || [key])\\n        });\\n      }\\n      currentZoneId = key;\\n      activatePreparedRiverMode(currentRiverMode, { zoneIds: [key], draw: true });\\n      restoreAnalysisCacheForMode(currentRiverMode);\\n      riverModesReady = true;\\n      setRiverModeButtonsDisabled(false);\\n      updateRiverModeNote();\\n      return true;\\n    }';
-if(!s.includes(cacheOld))throw new Error('구역 캐시 삽입 위치 없음');s=s.replace(cacheOld,cacheNew);
-const analysisOld=`        for (const [mode, analysis] of modeAnalysisMaps.entries()) {
-          viewAnalysisCacheByMode.set(mode, {
-            analysis,
-            calculatedZones: new Set([cacheKey])
-          });
-        }
-
-        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });`;
-const analysisNew=`        const completedByMode = new Map();
-        for (const [mode, analysis] of modeAnalysisMaps.entries()) {
-          const activeCache = {
-            analysis: new Map(analysis),
-            calculatedZones: new Set([cacheKey])
-          };
-          viewAnalysisCacheByMode.set(mode, activeCache);
-          completedByMode.set(mode, {
-            analysis: new Map(analysis),
-            calculatedZones: new Set([cacheKey])
-          });
-        }
-        completedZoneResultCache.set(cacheKey, { byMode: completedByMode });
-
-        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });`;
-if(!s.includes(analysisOld))throw new Error('계산 완료 캐시 저장 위치 없음');s=s.replace(analysisOld,analysisNew);
-const startOld='      const started = performance.now();';
-const startNew=`      const started = performance.now();
-      const previousRequestRenderMode = viewer.scene.requestRenderMode;
-      const previousMaximumRenderTimeChange = viewer.scene.maximumRenderTimeChange;
-      if (osmDeferredTimer) {
-        clearTimeout(osmDeferredTimer);
-        osmDeferredTimer = null;
-      }
-      if (osmBuildingsTileset) osmBuildingsTileset.show = false;
-      viewer.scene.requestRenderMode = true;
-      viewer.scene.maximumRenderTimeChange = Number.POSITIVE_INFINITY;`;
-if(!s.includes(startOld))throw new Error('계산 시작 최적화 위치 없음');s=s.replace(startOld,startNew);
-s=s.replace('        yieldEvery: 120','        yieldEvery: 240');
-const osmDoneOld=`        setTimeout(() => {
-          if (!osmBuildingsTileset && !osmBuildingsLoading) showOsmBuildings();
-        }, 300);`;
-if(s.includes(osmDoneOld))s=s.replace(osmDoneOld,'');
-const finallyOld=`      } finally {
-        clearInterval(progressTimer);
-      }`;
-const finallyNew=`      } finally {
-        clearInterval(progressTimer);
-        viewer.scene.requestRenderMode = previousRequestRenderMode;
-        viewer.scene.maximumRenderTimeChange = previousMaximumRenderTimeChange;
-        if (osmBuildingsTileset) {
-          osmBuildingsTileset.show = true;
-          viewer.scene.requestRender();
-        } else {
-          osmDeferredTimer = setTimeout(() => {
-            osmDeferredTimer = null;
-            if (!riverModesAnalysisPromise && !osmBuildingsTileset && !osmBuildingsLoading) showOsmBuildings();
-          }, 8000);
-        }
-      }`;
-if(!s.includes(finallyOld))throw new Error('계산 종료 최적화 위치 없음');s=s.replace(finallyOld,finallyNew);
-rep('updateRiverModeNotePatch',String.raw`
-    function updateRiverModeNote() {
-      if (!riverModeNoteEl) return;
-      if (currentZoneId === "ALL") {
-        riverModeNoteEl.textContent = "유닛 클릭 대기 · 계산 완료 구역은 경량 캐시에 유지됩니다.";
-        return;
-      }
-      riverModeNoteEl.textContent = riverModesReady
-        ? zoneLabelForStatus(currentZoneId) + " 계산 완료 · 재방문 시 즉시 복원 · 현재 기준: " + activeRiverConfig().label
-        : zoneLabelForStatus(currentZoneId) + " 전체 유닛 계산 중 · 3D 렌더링 일시 정지";
-    }`);
-rep('loadZonePatch',String.raw`
-    async function loadZone(zoneId) {
-      const requestedZoneId = zoneId || "ALL";
-      const config = ZONE_CONFIGS[requestedZoneId] || ZONE_CONFIGS.ALL;
-      if (unitsDataSource && footprints.length) {
-        currentZoneId = requestedZoneId;
-        setActiveZoneButton(requestedZoneId);
-        clearSelectedSightLines();
-        if (requestedZoneId !== "ALL" && restoreCompletedZone(requestedZoneId)) {
-          setStatus(config.label + " 저장 결과를 즉시 불러왔습니다.\n재계산하지 않습니다.");
-        } else {
-          setStatus(requestedZoneId === "ALL"
-            ? "전체 유닛 표시 중\n계산할 구역의 유닛을 클릭하세요.\n계산 완료 구역은 경량 캐시에 유지됩니다."
-            : config.label + " 유닛 클릭 대기\n버튼만으로는 계산하지 않습니다.\n" + config.label + " 안의 유닛을 클릭하면 해당 구역 전체를 계산합니다.");
-          updateRiverModeNote();
-        }
-        return;
-      }
-      const generation = ++optimizedCalculationGeneration;
-      currentZoneId = "ALL";
-      setActiveZoneButton("ALL");
-      riverModesReady = false;
-      setRiverModeButtonsDisabled(true);
-      updateRiverModeNote();
-      setStatus("2·3·4·5구역 전체 유닛을 불러오는 중입니다.");
-      try {
-        const zoneIds = ["2", "3", "4", "5"];
-        const riverFilesPromise = preloadRiverModeFiles();
-        const unitsPromise = Promise.all(zoneIds.map(async id => ({zoneId:id,data:await fetchGeoJson(ZONE_CONFIGS[id].unitsUrl)}))).then(combineFeatureCollections);
-        const [, unitsData] = await Promise.all([riverFilesPromise, unitsPromise]);
-        if (generation !== optimizedCalculationGeneration) return;
-        preparedRiverStateByMode.clear();
-        activatePreparedRiverMode(currentRiverMode, { zoneIds, draw: true });
-        await loadGeoJson(unitsData, "전체");
-        if (generation !== optimizedCalculationGeneration) return;
-        currentZoneId = "ALL";
-        setActiveZoneButton("ALL");
-        riverModesReady = false;
-        setRiverModeButtonsDisabled(true);
-        updateRiverModeNote();
-        setStatus("전체 지도 로드 완료\n어느 구역 유닛이든 클릭하면 해당 구역 전체를 계산합니다.\n완료된 구역은 경량 캐시에 유지됩니다.\n나머지 구역 유닛도 차폐물로 유지됩니다.");
-      } catch (error) {
-        if (generation !== optimizedCalculationGeneration) return;
-        riverModesReady = false;
-        setRiverModeButtonsDisabled(false);
-        updateRiverModeNote();
-        setStatus("전체 지도 로드 실패: " + error.message);
-      }
-    }`);
-rep('selectionPatch',String.raw`
-    viewer.selectedEntityChanged.addEventListener(async (entity) => {
-      updateEyeFloorInput(entity);
-      clearSelectedSightLines();
-      if (!entity || !entity.polygon || !entity.fidValue) {
-        if (lastPickedHeightScreenPosition) setTimeout(() => updatePickedHeightDetails(lastPickedHeightScreenPosition), 0);
-        else updateSelectionDetails(null);
-        return;
-      }
-      showLegendForSelectedEntity(entity);
-      updateSelectionDetails(entity);
-      const clickedZoneId = zoneIdFromEntity(entity);
-      if (!clickedZoneId || !ZONE_CONFIGS[clickedZoneId]) {
-        setStatus("선택한 유닛의 구역을 확인하지 못했습니다.");
-        return;
-      }
-      const fid = String(entity.fidValue);
-      const sameZoneReady = currentZoneId === clickedZoneId && riverModesReady && viewAnalysisByFid.has(fid);
-      if (!sameZoneReady) {
-        if (currentZoneId !== clickedZoneId && riverModesAnalysisPromise) optimizedCalculationGeneration += 1;
-        currentZoneId = clickedZoneId;
-        setActiveZoneButton(clickedZoneId);
-        if (restoreCompletedZone(clickedZoneId)) {
-          setStatus(zoneLabelForStatus(clickedZoneId) + " 저장 결과를 즉시 불러왔습니다.\n재계산하지 않습니다.");
-        } else if (riverModesAnalysisPromise && optimizedAnalysisPromiseGeneration === optimizedCalculationGeneration) {
-          await riverModesAnalysisPromise;
-        } else {
-          optimizedCalculationGeneration += 1;
-          preparedRiverStateByMode.clear();
-          resetViewAnalysisCache();
-          riverModesReady = false;
-          setRiverModeButtonsDisabled(true);
-          updateRiverModeNote();
-          activatePreparedRiverMode(currentRiverMode, { zoneIds: [clickedZoneId], draw: true });
-          setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 시작\n보수적·완화적 전체 유닛과 전층을 계산합니다.\n계산 중 3D 렌더링을 일시 정지합니다.");
-          try {
-            await prepareBothRiverModeAnalyses(clickedZoneId);
-          } catch (error) {
-            setStatus(zoneLabelForStatus(clickedZoneId) + " 계산 실패: " + error.message);
-            return;
-          }
-        }
-      }
-      if (viewer.selectedEntity !== entity) return;
-      if (!viewAnalysisByFid.has(fid)) {
-        setStatus(zoneLabelForStatus(clickedZoneId) + " 전체 계산 결과를 준비하지 못했습니다.");
-        return;
-      }
-      drawSelectedSightLines(entity);
-      updateSelectionDetails(entity);
-      updateFloorTotalAngle(entity);
-    });`);
-s=s.replace(/document\.open\(\);\s*document\.write\(source\);\s*document\.close\(\);/,"        source = source.replace('</body>', '<script>' + \"\\n(() => {\\n  if (window.__APG_PREMIUM_VISUAL__) return;\\n  window.__APG_PREMIUM_VISUAL__ = true;\\n\\n  const state = {\\n    premium: true,\\n    waterEntities: [],\\n    imagery: [],\\n    scene: {},\\n    osmStyle: null\\n  };\\n\\n  const grade = {\\n    bg: \\\"linear-gradient(135deg,rgba(8,18,38,.94),rgba(48,25,31,.91))\\\",\\n    border: \\\"rgba(245,196,111,.72)\\\",\\n    gold: \\\"#f4c777\\\"\\n  };\\n\\n  const style = document.createElement(\\\"style\\\");\\n  style.textContent = [\\n    \\\"#premiumVisualPanel{position:fixed;right:14px;top:14px;z-index:9999;width:224px;padding:12px;border:1px solid \\\"+grade.border+\\\";border-radius:14px;background:\\\"+grade.bg+\\\";box-shadow:0 12px 34px rgba(0,0,0,.38);backdrop-filter:blur(12px);font-family:Arial,'Malgun Gothic',sans-serif;color:#fff}\\\",\\n    \\\"#premiumVisualPanel .pv-title{font-size:14px;font-weight:800;letter-spacing:.2px;margin-bottom:9px;color:\\\"+grade.gold+\\\"}\\\",\\n    \\\"#premiumVisualPanel .pv-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}\\\",\\n    \\\"#premiumVisualPanel button{border:1px solid rgba(255,255,255,.3);border-radius:9px;padding:8px 6px;background:rgba(255,255,255,.08);color:#e5e7eb;font-weight:700;cursor:pointer}\\\",\\n    \\\"#premiumVisualPanel button.active{background:linear-gradient(135deg,#d79a44,#f4cf88);color:#1f2937;border-color:#ffe2a8}\\\",\\n    \\\"#premiumVisualPanel .pv-note{font-size:10px;line-height:1.45;color:#cbd5e1;margin-top:8px}\\\"\\n  ].join(\\\"\\\");\\n  document.head.appendChild(style);\\n\\n  const panel = document.createElement(\\\"div\\\");\\n  panel.id = \\\"premiumVisualPanel\\\";\\n  panel.innerHTML = '<div class=\\\"pv-title\\\">V56 프리미엄 조망</div><div class=\\\"pv-row\\\"><button id=\\\"pvBasic\\\">기본 분석</button><button id=\\\"pvPremium\\\" class=\\\"active\\\">프리미엄</button></div><div class=\\\"pv-note\\\">계산·배치 데이터는 동일하며 화면 질감과 한강 분위기만 강화합니다.</div>';\\n  document.body.appendChild(panel);\\n\\n  const basicButton = panel.querySelector(\\\"#pvBasic\\\");\\n  const premiumButton = panel.querySelector(\\\"#pvPremium\\\");\\n\\n  function saveScene() {\\n    if (!window.Cesium || typeof viewer === \\\"undefined\\\") return;\\n    state.scene = {\\n      highDynamicRange: viewer.scene.highDynamicRange,\\n      globeLighting: viewer.scene.globe.enableLighting,\\n      backgroundColor: viewer.scene.backgroundColor,\\n      fxaa: viewer.scene.postProcessStages.fxaa ? viewer.scene.postProcessStages.fxaa.enabled : false,\\n      shadows: viewer.shadows\\n    };\\n    if (viewer.scene.postProcessStages.bloom) {\\n      state.scene.bloomEnabled = viewer.scene.postProcessStages.bloom.enabled;\\n    }\\n    if (viewer.imageryLayers) {\\n      for (let i=0;i<viewer.imageryLayers.length;i++) {\\n        const layer=viewer.imageryLayers.get(i);\\n        state.imagery.push({layer,brightness:layer.brightness,contrast:layer.contrast,saturation:layer.saturation,gamma:layer.gamma});\\n      }\\n    }\\n  }\\n\\n  function premiumColor(color) {\\n    const tint = Cesium.Color.fromCssColorString(\\\"#193b59\\\");\\n    const mixed = Cesium.Color.lerp(color || Cesium.Color.SLATEGRAY, tint, .38, new Cesium.Color());\\n    mixed.alpha = .91;\\n    return mixed;\\n  }\\n\\n  function ensureWaterAccents() {\\n    if (!state.premium || state.waterEntities.length || typeof riverLinesForDisplay === \\\"undefined\\\") return;\\n    for (const line of riverLinesForDisplay) {\\n      if (!line || line.length < 2) continue;\\n      const degrees=[];\\n      for (const p of line) degrees.push(p.lon,p.lat,2.5);\\n      const positions=Cesium.Cartesian3.fromDegreesArrayHeights(degrees);\\n      state.waterEntities.push(viewer.entities.add({\\n        name:\\\"프리미엄 한강 수면 강조\\\",\\n        polyline:{\\n          positions,\\n          width:18,\\n          material:new Cesium.PolylineGlowMaterialProperty({\\n            color:Cesium.Color.fromCssColorString(\\\"#51b8d8\\\").withAlpha(.42),\\n            glowPower:.35,\\n            taperPower:.6\\n          }),\\n          clampToGround:false\\n        }\\n      }));\\n      state.waterEntities.push(viewer.entities.add({\\n        name:\\\"프리미엄 한강 석양 반사\\\",\\n        polyline:{\\n          positions,\\n          width:4,\\n          material:new Cesium.PolylineGlowMaterialProperty({\\n            color:Cesium.Color.fromCssColorString(\\\"#f5b97a\\\").withAlpha(.56),\\n            glowPower:.22\\n          }),\\n          clampToGround:false\\n        }\\n      }));\\n    }\\n  }\\n\\n  function clearWaterAccents() {\\n    while (state.waterEntities.length) viewer.entities.remove(state.waterEntities.pop());\\n  }\\n\\n  function applyUnits() {\\n    if (typeof unitsDataSource === \\\"undefined\\\" || !unitsDataSource) return;\\n    for (const entity of unitsDataSource.entities.values) {\\n      if (!entity.polygon) continue;\\n      if (!entity._pvOriginalBase) entity._pvOriginalBase = entity.baseColor || Cesium.Color.SLATEGRAY;\\n      if (!entity._pvOriginalShadow) entity._pvOriginalShadow = entity.polygon.shadows;\\n      if (state.premium) {\\n        entity.baseColor = premiumColor(entity._pvOriginalBase);\\n        const opacity = currentFilter === \\\"ALL\\\" || entity.unitType === currentFilter ? .91 : .055;\\n        entity.polygon.material = entity.baseColor.withAlpha(opacity);\\n        entity.polygon.shadows = Cesium.ShadowMode.ENABLED;\\n      } else {\\n        entity.baseColor = entity._pvOriginalBase;\\n        const opacity = currentFilter === \\\"ALL\\\" || entity.unitType === currentFilter ? 1 : .05;\\n        entity.polygon.material = entity.baseColor.withAlpha(opacity);\\n        entity.polygon.shadows = entity._pvOriginalShadow || Cesium.ShadowMode.DISABLED;\\n      }\\n    }\\n  }\\n\\n  function applyOutlines() {\\n    if (typeof overlayEntities === \\\"undefined\\\") return;\\n    for (const entity of overlayEntities) {\\n      if (!entity.polyline) continue;\\n      if (!entity._pvOriginalMaterial) entity._pvOriginalMaterial = entity.polyline.material;\\n      if (!entity._pvOriginalWidth) entity._pvOriginalWidth = entity.polyline.width;\\n      if (state.premium) {\\n        entity.polyline.width = 1.35;\\n        entity.polyline.material = new Cesium.PolylineGlowMaterialProperty({\\n          color:Cesium.Color.fromCssColorString(\\\"#e6b86b\\\").withAlpha(.82),\\n          glowPower:.08\\n        });\\n      } else {\\n        entity.polyline.width = entity._pvOriginalWidth;\\n        entity.polyline.material = entity._pvOriginalMaterial;\\n      }\\n    }\\n  }\\n\\n  function applyRiverLines() {\\n    if (typeof riverLineEntities === \\\"undefined\\\") return;\\n    for (const entity of riverLineEntities) {\\n      if (!entity.polyline) continue;\\n      if (!entity._pvOriginalRiverMaterial) entity._pvOriginalRiverMaterial = entity.polyline.material;\\n      if (!entity._pvOriginalRiverWidth) entity._pvOriginalRiverWidth = entity.polyline.width;\\n      if (state.premium) {\\n        entity.polyline.width = 6;\\n        entity.polyline.material = new Cesium.PolylineGlowMaterialProperty({\\n          color:Cesium.Color.fromCssColorString(\\\"#7dd7ea\\\").withAlpha(.88),\\n          glowPower:.24\\n        });\\n      } else {\\n        entity.polyline.width = entity._pvOriginalRiverWidth;\\n        entity.polyline.material = entity._pvOriginalRiverMaterial;\\n      }\\n    }\\n  }\\n\\n  function applyScene() {\\n    if (!window.Cesium || typeof viewer === \\\"undefined\\\") return;\\n    if (state.premium) {\\n      viewer.scene.highDynamicRange = true;\\n      viewer.scene.globe.enableLighting = true;\\n      viewer.scene.backgroundColor = Cesium.Color.fromCssColorString(\\\"#846d82\\\");\\n      viewer.shadows = true;\\n      if (viewer.scene.postProcessStages.fxaa) viewer.scene.postProcessStages.fxaa.enabled = true;\\n      const bloom=viewer.scene.postProcessStages.bloom;\\n      if (bloom) {\\n        bloom.enabled=true;\\n        if (bloom.uniforms) {\\n          bloom.uniforms.glowOnly=false;\\n          bloom.uniforms.contrast=96;\\n          bloom.uniforms.brightness=-.18;\\n          bloom.uniforms.delta=1;\\n          bloom.uniforms.sigma=2.2;\\n          bloom.uniforms.stepSize=1;\\n        }\\n      }\\n      if (viewer.scene.skyAtmosphere) {\\n        viewer.scene.skyAtmosphere.hueShift = -.035;\\n        viewer.scene.skyAtmosphere.saturationShift = .18;\\n        viewer.scene.skyAtmosphere.brightnessShift = -.06;\\n      }\\n      if (viewer.scene.fog) {\\n        viewer.scene.fog.enabled=true;\\n        viewer.scene.fog.density=.00018;\\n        viewer.scene.fog.minimumBrightness=.28;\\n      }\\n      for (let i=0;i<viewer.imageryLayers.length;i++) {\\n        const layer=viewer.imageryLayers.get(i);\\n        layer.brightness=.86; layer.contrast=1.12; layer.saturation=.82; layer.gamma=.92;\\n      }\\n      if (typeof osmBuildingsTileset !== \\\"undefined\\\" && osmBuildingsTileset) {\\n        if (!state.osmStyle) state.osmStyle=osmBuildingsTileset.style;\\n        osmBuildingsTileset.style=new Cesium.Cesium3DTileStyle({\\n          color:\\\"color('#aab4c2', 0.96)\\\",\\n          show:true\\n        });\\n      }\\n    } else {\\n      viewer.scene.highDynamicRange=state.scene.highDynamicRange;\\n      viewer.scene.globe.enableLighting=state.scene.globeLighting;\\n      viewer.scene.backgroundColor=state.scene.backgroundColor;\\n      viewer.shadows=state.scene.shadows;\\n      if (viewer.scene.postProcessStages.fxaa) viewer.scene.postProcessStages.fxaa.enabled=state.scene.fxaa;\\n      if (viewer.scene.postProcessStages.bloom) viewer.scene.postProcessStages.bloom.enabled=!!state.scene.bloomEnabled;\\n      for (const s of state.imagery) {\\n        s.layer.brightness=s.brightness; s.layer.contrast=s.contrast; s.layer.saturation=s.saturation; s.layer.gamma=s.gamma;\\n      }\\n      if (typeof osmBuildingsTileset !== \\\"undefined\\\" && osmBuildingsTileset && state.osmStyle) osmBuildingsTileset.style=state.osmStyle;\\n    }\\n  }\\n\\n  function refresh() {\\n    if (!window.Cesium || typeof viewer === \\\"undefined\\\") return;\\n    applyScene();\\n    applyUnits();\\n    applyOutlines();\\n    applyRiverLines();\\n    if (state.premium) ensureWaterAccents(); else clearWaterAccents();\\n    viewer.scene.requestRender();\\n  }\\n\\n  function setPremium(enabled) {\\n    state.premium=enabled;\\n    premiumButton.classList.toggle(\\\"active\\\",enabled);\\n    basicButton.classList.toggle(\\\"active\\\",!enabled);\\n    refresh();\\n  }\\n\\n  basicButton.addEventListener(\\\"click\\\",()=>setPremium(false));\\n  premiumButton.addEventListener(\\\"click\\\",()=>setPremium(true));\\n\\n  const wait=setInterval(()=>{\\n    if (!window.Cesium || typeof viewer === \\\"undefined\\\") return;\\n    clearInterval(wait);\\n    saveScene();\\n    setPremium(true);\\n    setInterval(()=>{\\n      applyUnits();\\n      applyOutlines();\\n      applyRiverLines();\\n      if (state.premium) ensureWaterAccents();\\n    },1400);\\n  },150);\\n})();\\n\" + '<\\\\/script></body>');document.open();document.write(source);document.close();");document.open();document.write(s);document.close()}catch(e){console.error(e);m.textContent='앱 수정본을 불러오지 못했습니다.\n'+e.message}})();
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>압구정 조망 시뮬레이션 V56 프리미엄</title>
+<style>html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#0b1526}#app{border:0;display:block}</style>
+</head><body>
+<iframe id="app" title="압구정 조망 시뮬레이션" src="./index_v55_zone_cache_light.html?v=20260711-55"></iframe>
+<script>
+const premiumRuntime="\n(() => {\n  if(window.__APG_PREMIUM_VISUAL__) return;\n  window.__APG_PREMIUM_VISUAL__=true;\n  const S={premium:true,water:[],scene:null,layers:[],osm:null};\n  const css=document.createElement(\"style\");\n  css.textContent=\"#pv56{position:fixed;z-index:99999;right:14px;top:14px;width:220px;padding:12px;border:1px solid rgba(247,202,123,.76);border-radius:14px;background:linear-gradient(135deg,rgba(8,18,38,.95),rgba(57,29,35,.92));box-shadow:0 12px 34px rgba(0,0,0,.4);backdrop-filter:blur(12px);font:12px Arial,'Malgun Gothic',sans-serif;color:#fff}#pv56 b{display:block;color:#f4c777;font-size:14px;margin-bottom:9px}#pv56 .r{display:grid;grid-template-columns:1fr 1fr;gap:6px}#pv56 button{padding:8px 4px;border:1px solid rgba(255,255,255,.28);border-radius:9px;background:rgba(255,255,255,.08);color:#e5e7eb;font-weight:700;cursor:pointer}#pv56 button.on{background:linear-gradient(135deg,#d99b45,#f5d08b);color:#172033;border-color:#ffe2a8}#pv56 small{display:block;margin-top:8px;line-height:1.4;color:#cbd5e1}\";\n  document.head.appendChild(css);\n  const box=document.createElement(\"div\");\n  box.id=\"pv56\";\n  box.innerHTML='<b>V56 프리미엄 조망</b><div class=\"r\"><button id=\"pvB\">기본 분석</button><button id=\"pvP\" class=\"on\">프리미엄</button></div><small>조망 계산·배치 데이터는 그대로 두고 유리 질감과 한강 분위기만 강화합니다.</small>';\n  document.body.appendChild(box);\n  const b=box.querySelector(\"#pvB\"),p=box.querySelector(\"#pvP\");\n\n  function ready(){return window.Cesium&&typeof viewer!==\"undefined\";}\n  function glass(c){\n    const t=Cesium.Color.fromCssColorString(\"#173a58\");\n    const x=Cesium.Color.lerp(c||Cesium.Color.SLATEGRAY,t,.38,new Cesium.Color());\n    x.alpha=.91; return x;\n  }\n  function save(){\n    S.scene={hdr:viewer.scene.highDynamicRange,light:viewer.scene.globe.enableLighting,bg:viewer.scene.backgroundColor,shadow:viewer.shadows,fxaa:viewer.scene.postProcessStages.fxaa?.enabled,bloom:viewer.scene.postProcessStages.bloom?.enabled};\n    for(let i=0;i<viewer.imageryLayers.length;i++){const l=viewer.imageryLayers.get(i);S.layers.push({l,b:l.brightness,c:l.contrast,s:l.saturation,g:l.gamma});}\n  }\n  function units(){\n    if(typeof unitsDataSource===\"undefined\"||!unitsDataSource)return;\n    for(const e of unitsDataSource.entities.values){\n      if(!e.polygon)continue;\n      if(!e._pvBase)e._pvBase=e.baseColor||Cesium.Color.SLATEGRAY;\n      if(e._pvShadow===undefined)e._pvShadow=e.polygon.shadows;\n      e.baseColor=S.premium?glass(e._pvBase):e._pvBase;\n      const show=currentFilter===\"ALL\"||e.unitType===currentFilter;\n      e.polygon.material=e.baseColor.withAlpha(show?(S.premium?.91:1):.055);\n      e.polygon.shadows=S.premium?Cesium.ShadowMode.ENABLED:(e._pvShadow||Cesium.ShadowMode.DISABLED);\n    }\n  }\n  function outlines(){\n    if(typeof overlayEntities===\"undefined\")return;\n    for(const e of overlayEntities){\n      if(!e.polyline)continue;\n      if(!e._pvMat)e._pvMat=e.polyline.material;\n      if(e._pvWidth===undefined)e._pvWidth=e.polyline.width;\n      if(S.premium){\n        e.polyline.width=1.35;\n        e.polyline.material=new Cesium.PolylineGlowMaterialProperty({color:Cesium.Color.fromCssColorString(\"#e7b869\").withAlpha(.84),glowPower:.08});\n      }else{e.polyline.width=e._pvWidth;e.polyline.material=e._pvMat;}\n    }\n  }\n  function river(){\n    if(typeof riverLineEntities!==\"undefined\")for(const e of riverLineEntities){\n      if(!e.polyline)continue;\n      if(!e._pvRiverMat)e._pvRiverMat=e.polyline.material;\n      if(e._pvRiverWidth===undefined)e._pvRiverWidth=e.polyline.width;\n      if(S.premium){e.polyline.width=6;e.polyline.material=new Cesium.PolylineGlowMaterialProperty({color:Cesium.Color.fromCssColorString(\"#72d3e7\").withAlpha(.9),glowPower:.25});}\n      else{e.polyline.width=e._pvRiverWidth;e.polyline.material=e._pvRiverMat;}\n    }\n  }\n  function water(){\n    if(!S.premium||S.water.length||typeof riverLinesForDisplay===\"undefined\")return;\n    for(const line of riverLinesForDisplay){\n      if(!line||line.length<2)continue;\n      const d=[];for(const q of line)d.push(q.lon,q.lat,2.5);\n      const pos=Cesium.Cartesian3.fromDegreesArrayHeights(d);\n      S.water.push(viewer.entities.add({name:\"프리미엄 한강 수면\",polyline:{positions:pos,width:18,material:new Cesium.PolylineGlowMaterialProperty({color:Cesium.Color.fromCssColorString(\"#4eb6d8\").withAlpha(.42),glowPower:.34,taperPower:.6})}}));\n      S.water.push(viewer.entities.add({name:\"프리미엄 석양 반사\",polyline:{positions:pos,width:4,material:new Cesium.PolylineGlowMaterialProperty({color:Cesium.Color.fromCssColorString(\"#f2b875\").withAlpha(.58),glowPower:.22})}}));\n    }\n  }\n  function clearWater(){while(S.water.length)viewer.entities.remove(S.water.pop());}\n  function scene(){\n    if(S.premium){\n      viewer.scene.highDynamicRange=true;viewer.scene.globe.enableLighting=true;viewer.shadows=true;\n      viewer.scene.backgroundColor=Cesium.Color.fromCssColorString(\"#806d82\");\n      if(viewer.scene.postProcessStages.fxaa)viewer.scene.postProcessStages.fxaa.enabled=true;\n      const bloom=viewer.scene.postProcessStages.bloom;if(bloom){bloom.enabled=true;if(bloom.uniforms){bloom.uniforms.glowOnly=false;bloom.uniforms.contrast=96;bloom.uniforms.brightness=-.18;bloom.uniforms.delta=1;bloom.uniforms.sigma=2.2;bloom.uniforms.stepSize=1;}}\n      if(viewer.scene.skyAtmosphere){viewer.scene.skyAtmosphere.hueShift=-.035;viewer.scene.skyAtmosphere.saturationShift=.18;viewer.scene.skyAtmosphere.brightnessShift=-.06;}\n      if(viewer.scene.fog){viewer.scene.fog.enabled=true;viewer.scene.fog.density=.00018;viewer.scene.fog.minimumBrightness=.28;}\n      for(let i=0;i<viewer.imageryLayers.length;i++){const l=viewer.imageryLayers.get(i);l.brightness=.86;l.contrast=1.12;l.saturation=.82;l.gamma=.92;}\n      if(typeof osmBuildingsTileset!==\"undefined\"&&osmBuildingsTileset){if(!S.osm)S.osm=osmBuildingsTileset.style;osmBuildingsTileset.style=new Cesium.Cesium3DTileStyle({color:\"color('#aab4c2',0.96)\",show:true});}\n    }else{\n      viewer.scene.highDynamicRange=S.scene.hdr;viewer.scene.globe.enableLighting=S.scene.light;viewer.shadows=S.scene.shadow;viewer.scene.backgroundColor=S.scene.bg;\n      if(viewer.scene.postProcessStages.fxaa)viewer.scene.postProcessStages.fxaa.enabled=S.scene.fxaa;\n      if(viewer.scene.postProcessStages.bloom)viewer.scene.postProcessStages.bloom.enabled=!!S.scene.bloom;\n      for(const x of S.layers){x.l.brightness=x.b;x.l.contrast=x.c;x.l.saturation=x.s;x.l.gamma=x.g;}\n      if(typeof osmBuildingsTileset!==\"undefined\"&&osmBuildingsTileset&&S.osm)osmBuildingsTileset.style=S.osm;\n    }\n  }\n  function apply(){\n    if(!ready())return;\n    scene();units();outlines();river();if(S.premium)water();else clearWater();viewer.scene.requestRender();\n  }\n  function mode(v){S.premium=v;b.classList.toggle(\"on\",!v);p.classList.toggle(\"on\",v);apply();}\n  b.onclick=()=>mode(false);p.onclick=()=>mode(true);\n  const wait=setInterval(()=>{if(!ready())return;clearInterval(wait);save();mode(true);setInterval(()=>{units();outlines();river();if(S.premium)water();},1400);},150);\n})();";
+const frame=document.getElementById("app");
+frame.addEventListener("load",()=>{
+  const inject=()=>{
+    try{
+      const doc=frame.contentDocument;
+      if(!doc||!doc.body)return setTimeout(inject,250);
+      if(doc.getElementById("pv56"))return;
+      const script=doc.createElement("script");
+      script.textContent=premiumRuntime;
+      doc.body.appendChild(script);
+    }catch(error){console.error("V56 premium injection failed",error);}
+  };
+  setTimeout(inject,300);
+});
 </script></body></html>
