@@ -11,7 +11,7 @@ frame.addEventListener("load",()=>{
   const inject=()=>{
     try{
       const doc=frame.contentDocument;
-      if(!doc||!doc.body||!doc.querySelector('#cesiumContainer')||!frame.contentWindow.Cesium)return setTimeout(inject,250);
+      if(!doc||!doc.body||!doc.querySelector('#cesiumContainer'))return setTimeout(inject,250);
       if(doc.getElementById("pv56"))return;
       const script=doc.createElement("script");
       script.textContent=premiumRuntime;
