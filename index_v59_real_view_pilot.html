@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>압구정 조망 V59 실감 조망 시험</title>
+<style>html,body,#app{width:100%;height:100%;margin:0;overflow:hidden;background:#eef2f5}#app{border:0;display:block}</style></head>
+<body><iframe id="app" title="압구정 조망 시뮬레이션" src="./index_v58_all_geometry_pilot.html?v=20260722-58e"></iframe>
+<script>
+(()=>{
+ const host=document.getElementById("app");
+ function boot(){
+  try{
+   const v58=host.contentWindow,coreFrame=v58.document.getElementById("app");
+   if(!coreFrame||!coreFrame.contentWindow||!coreFrame.contentWindow.viewer){setTimeout(boot,700);return}
+   const w=coreFrame.contentWindow,d=w.document,C=w.Cesium,viewer=w.viewer;
+   if(w.__APG_V59_REAL_VIEW__)return;w.__APG_V59_REAL_VIEW__=true;
+   const css=d.createElement("style");
+   css.textContent="#real59{position:fixed;z-index:99998;right:14px;top:270px;width:270px;padding:12px;border:1px solid #8092a3;border-radius:12px;background:rgba(25,34,44,.94);box-shadow:0 8px 25px rgba(0,0,0,.24);font:12px Arial,'Malgun Gothic',sans-serif;color:#fff}#real59 b{display:block;font-size:14px;margin-bottom:8px}#real59 .row{display:grid;grid-template-columns:1fr 1fr;gap:6px}#real59 button{padding:8px 5px;border:1px solid #778899;border-radius:8px;background:#354452;color:#eef2f5;font-weight:700;cursor:pointer}#real59 button.on{background:#dceaf3;color:#16222d;border-color:#fff}#real59 small{display:block;color:#cbd5e1;line-height:1.45;margin-top:8px}#real59 em{display:block;color:#9fe0ee;font-style:normal;margin-top:6px}";
+   d.head.appendChild(css);
+   const box=d.createElement("div");box.id="real59";
+   box.innerHTML='<b>V59 눈높이 실감 조망</b><div class="row"><button id="rvBase59" class="on">기본 조망</button><button id="rvReal59">실감 조망</button></div><small>눈높이 360도에서만 한강 수면·정오광·원경 대기감을 적용합니다.</small><em id="rvStatus59">기본 조망</em>';
+   d.body.appendChild(box);
+   const base=box.querySelector("#rvBase59"),real=box.querySelector("#rvReal59"),status=box.querySelector("#rvStatus59");
+   let wanted=false,active=false,water=null,lastMapButton=null;
+   const saved={fogEnabled:viewer.scene.fog.enabled,fogDensity:viewer.scene.fog.density,atmoBrightness:viewer.scene.skyAtmosphere&&viewer.scene.skyAtmosphere.brightnessShift,atmoHue:viewer.scene.skyAtmosphere&&viewer.scene.skyAtmosphere.hueShift,atmoSat:viewer.scene.skyAtmosphere&&viewer.scene.skyAtmosphere.saturationShift,globeBrightness:viewer.scene.globe.enableLighting};
+   function findButton(label){return [...d.querySelectorAll("button")].find(x=>(x.textContent||"").trim().includes(label))}
+   function waterPrimitive(){
+    const positions=C.Cartesian3.fromDegreesArray([126.986,37.528,127.003,37.532,127.025,37.531,127.048,37.526,127.073,37.524,127.085,37.518,127.080,37.510,127.058,37.513,127.035,37.516,127.012,37.520,126.991,37.520]);
+    const geometry=new C.PolygonGeometry({polygonHierarchy:new C.PolygonHierarchy(positions),height:7,vertexFormat:C.EllipsoidSurfaceAppearance.VERTEX_FORMAT});
+    const material=C.Material.fromType("Water",{baseWaterColor:new C.Color(.12,.42,.62,.42),blendColor:new C.Color(.18,.55,.76,.25),normalMap:C.buildModuleUrl("Assets/Textures/waterNormals.jpg"),frequency:520,animationSpeed:.008,amplitude:1.2,specularIntensity:.18});
+    return viewer.scene.primitives.add(new C.Primitive({geometryInstances:new C.GeometryInstance({geometry}),appearance:new C.EllipsoidSurfaceAppearance({material,aboveGround:true,translucent:true,renderState:{depthTest:{enabled:true},depthMask:false,blending:C.BlendingState.ALPHA_BLEND}}),asynchronous:false}));
+   }
+   function apply(){
+    if(active)return;active=true;
+    try{
+     if(!water)water=waterPrimitive();else water.show=true;
+     viewer.scene.fog.enabled=true;viewer.scene.fog.density=.00018;
+     if(viewer.scene.skyAtmosphere){viewer.scene.skyAtmosphere.brightnessShift=.08;viewer.scene.skyAtmosphere.hueShift=-.015;viewer.scene.skyAtmosphere.saturationShift=-.08}
+     viewer.scene.globe.enableLighting=false;
+     lastMapButton=[...d.querySelectorAll("button")].find(x=>x.disabled&&/도로지도|밝은지도|위성지도/.test(x.textContent||""));
+     const sat=findButton("위성지도");if(sat&&!sat.disabled)sat.click();
+     status.textContent="실감 조망 적용 · 정오광 / 잔잔한 수면 / 원경 대기";
+     viewer.scene.requestRender();
+    }catch(e){status.textContent="실감 조망 오류: "+e.message;console.error("V59",e)}
+   }
+   function restore(){
+    active=false;if(water)water.show=false;
+    viewer.scene.fog.enabled=saved.fogEnabled;viewer.scene.fog.density=saved.fogDensity;
+    if(viewer.scene.skyAtmosphere){viewer.scene.skyAtmosphere.brightnessShift=saved.atmoBrightness||0;viewer.scene.skyAtmosphere.hueShift=saved.atmoHue||0;viewer.scene.skyAtmosphere.saturationShift=saved.atmoSat||0}
+    viewer.scene.globe.enableLighting=saved.globeBrightness;
+    if(lastMapButton&&/도로지도|밝은지도/.test(lastMapButton.textContent||""))lastMapButton.click();
+    status.textContent=wanted?"실감 조망 대기 · 눈높이 360도를 누르세요":"기본 조망";
+    viewer.scene.requestRender();
+   }
+   base.onclick=()=>{wanted=false;base.classList.add("on");real.classList.remove("on");restore()};
+   real.onclick=()=>{wanted=true;real.classList.add("on");base.classList.remove("on");status.textContent="실감 조망 대기 · 눈높이 360도를 누르세요"};
+   d.addEventListener("click",ev=>{const t=ev.target&&ev.target.closest&&ev.target.closest("button");if(!t)return;const label=(t.textContent||"").trim();if(label.includes("눈높이 360도"))setTimeout(()=>{if(wanted)apply()},300);else if(label.includes("초기화면 복귀"))restore()},true);
+   status.textContent="기본 조망 · 실감 조망을 선택한 뒤 눈높이 360도를 누르세요";
+  }catch(e){setTimeout(boot,900)}
+ }
+ host.addEventListener("load",boot);setTimeout(boot,1200);
+})();
+</script></body></html>
